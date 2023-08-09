@@ -66,4 +66,4 @@ def gaussian_label_function(target_bb, sigma_factor=0.1, kernel_sz=1, feat_sz=16
 label_1 = gaussian_label_function( torch.tensor([54, 54, 112, 112]).view(1,-1))
 label_2 = gaussian_label_function( torch.tensor([74, 74, 132, 132]).view(1,-1))
 
-label = label_2-(0.5*label_1)
+label = torch.concat([label_1, label_2], dim=0)

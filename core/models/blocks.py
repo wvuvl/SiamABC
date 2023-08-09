@@ -284,7 +284,7 @@ class CorrelationConcat(nn.Module):
         
         self.gaussian_map = gaussian_map
         in_size = num_channels + num_corr_channels 
-        if self.gaussian_map:  in_size = in_size + 1 
+        if self.gaussian_map:  in_size = in_size + 2 # 2 chan gaussian map, 1 for t-2 and 2 for t-1 
         
         self.enc = nn.Sequential(
             SepConv(in_size, num_channels, kernel_size=3, padding=1),
@@ -295,9 +295,10 @@ class CorrelationConcat(nn.Module):
         trunc_normal_(self.weight, std=.02)
         
     def forward(self, z, x, d, g=None):
+        
         b, c, w, h = x.size()
         s = torch.matmul(z.permute(0, 2, 1), x.view(b, c, -1)).view(b, -1, w, h)
-        s = torch.cat([s, d], dim=1) if g==None else torch.cat([s, d, g*self.weight], dim=1) # applying a broadcast weight factor to the gaussian_map parameter g
+        s = torch.cat([s, d], dim=1) if g==None else torch.cat([s, d, g*self.weight], dim=1) # applying a broadcast weight factor to the gaussian_map parameter g (b, 2, 16, 16)
         s = self.enc(s)
         return s
     
