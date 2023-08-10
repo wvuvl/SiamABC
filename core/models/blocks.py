@@ -11,9 +11,11 @@ from typing import Any, Union, Tuple, List
 
 import torch
 import torch.nn as nn
-from src.mobile_cv.mobile_cv.model_zoo.models.fbnet_v2 import fbnet
+from mobile_cv.model_zoo.models.fbnet_v2 import fbnet
+# from core.src.mobile_cv.mobile_cv.model_zoo.models.fbnet_v2 import fbnet
 from einops import rearrange
 from timm.models.layers import trunc_normal_
+
 
 class Encoder(nn.Module):
     def __init__(self, pretrained: bool = True) -> None:
@@ -202,6 +204,7 @@ class BoxTower(nn.Module):
         conv_block: str = "regular",
         inchannels: int = 512,
         outchannels: int = 256,
+        gaussian_map=False
     ):
         super().__init__()
         tower = []
@@ -209,8 +212,8 @@ class BoxTower(nn.Module):
         # encode backbone
         self.cls_encode = EncodeBackbone(in_channels=inchannels, out_channels=outchannels, conv_block=conv_block)
         self.reg_encode = EncodeBackbone(in_channels=inchannels, out_channels=outchannels, conv_block=conv_block)
-        self.cls_dw = CorrelationConcat(num_channels=outchannels, conv_block=conv_block, gaussian_map=True)
-        self.reg_dw = CorrelationConcat(num_channels=outchannels, conv_block=conv_block, gaussian_map=True)
+        self.cls_dw = CorrelationConcat(num_channels=outchannels, conv_block=conv_block, gaussian_map=gaussian_map)
+        self.reg_dw = CorrelationConcat(num_channels=outchannels, conv_block=conv_block, gaussian_map=gaussian_map)
 
         # box pred head
         for i in range(towernum):
@@ -279,7 +282,7 @@ class CorrelationConcat(nn.Module):
     Mobile Correlation module
     """
 
-    def __init__(self, num_channels: int, num_corr_channels: int = 64, conv_block: str = "regular", gaussian_map=False):
+    def __init__(self, num_channels: int, num_corr_channels: int = 256, conv_block: str = "regular", gaussian_map=False):
         super().__init__()
         
         self.gaussian_map = gaussian_map
@@ -291,7 +294,7 @@ class CorrelationConcat(nn.Module):
             nn.BatchNorm2d(num_channels),
             nn.ReLU(inplace=True),
         )
-        self.weight = nn.Parameter(torch.empty(1, 1, num_channels))
+        self.weight = nn.Parameter(torch.empty(1, 2, 32, 32)) #gaussian map channels
         trunc_normal_(self.weight, std=.02)
         
     def forward(self, z, x, d, g=None):
