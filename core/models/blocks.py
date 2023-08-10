@@ -12,7 +12,6 @@ from typing import Any, Union, Tuple, List
 import torch
 import torch.nn as nn
 from mobile_cv.model_zoo.models.fbnet_v2 import fbnet
-# from core.src.mobile_cv.mobile_cv.model_zoo.models.fbnet_v2 import fbnet
 from einops import rearrange
 from timm.models.layers import trunc_normal_
 

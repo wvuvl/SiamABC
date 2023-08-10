@@ -12,44 +12,23 @@ from typing import Dict, Tuple, Any, Tuple, List
 import torch
 import torch.nn as nn
 
-
-
 from blocks import Encoder, AdjustLayer, BoxTower, SpatialSelfCrossAttention
-# from core.models.blocks import Encoder, AdjustLayer, BoxTower, SpatialSelfCrossAttention
-# from core.utils.utils import make_grid
-# from core.utils.constants import (
+TARGET_CLASSIFICATION_KEY = "TARGET_CLASSIFICATION_KEY"
+TARGET_REGRESSION_LABEL_KEY = "TARGET_REGRESSION_LABEL_KEY"
+SIMSIAM_SEARCH_OUT_KEY = "SIMSIAM_SEARCH_OUT_KEY"
+SIMSIAM_DYNAMIC_OUT_KEY = "SIMSIAM_DYNAMIC_OUT_KEY"
+
+
+# from models.blocks import Encoder, AdjustLayer, BoxTower, SpatialSelfCrossAttention
+# from utils.utils import make_grid
+# from utils.constants import (
 #     TARGET_REGRESSION_LABEL_KEY,
 #     TARGET_CLASSIFICATION_KEY,
 #     SIMSIAM_SEARCH_OUT_KEY,
 #     SIMSIAM_DYNAMIC_OUT_KEY   
 # )
 
-TARGET_CLASSIFICATION_KEY = "TARGET_CLASSIFICATION_KEY"
-TARGET_REGRESSION_WEIGHT_KEY = "TARGET_REGRESSION_WEIGHT_KEY"
-TARGET_REGRESSION_LABEL_KEY = "TARGET_REGRESSION_LABEL_KEY"
-TARGET_VISIBILITY_KEY = "TARGET_VISIBILITY_KEY"
-TARGET_EMBEDDING_KEY = "TARGET_EMBEDDING_KEY"
-TARGET_ANCHOR_EMBEDDING_KEY = "TARGET_ANCHOR_EMBEDDING_KEY"
-TARGET_POSITIVE_EMBEDDING_KEY = "TARGET_POSITIVE_EMBEDDING_KEY"
-TARGET_NEGATIVE_EMBEDDING_KEY = "TARGET_NEGATIVE_EMBEDDING_KEY"
-TRACKER_TARGET_SEARCH_IMAGE_KEY = "TRACKER_TARGET_SEARCH_IMAGE_KEY"
-TRACKER_TARGET_TEMPLATE_IMAGE_KEY = "TRACKER_TARGET_TEMPLATE_IMAGE_KEY"
-TRACKER_TARGET_BBOX_KEY = "TRACKER_TARGET_BBOX_KEY"
-TRACKER_TEMPLATE_BBOX_KEY = "TRACKER_TEMPLATE_BBOX_KEY"
-TRACKER_TARGET_SEARCH_FILENAME_KEY = "TRACKER_TARGET_SEARCH_FILENAME_KEY"
-TRACKER_TARGET_TEMPLATE_FILENAME_KEY = "TRACKER_TARGET_TEMPLATE_FILENAME_KEY"
-TRACKER_TARGET_SEARCH_INDEX_KEY = "TRACKER_TARGET_SEARCH_INDEX_KEY"
-TRACKER_TARGET_TEMPLATE_INDEX_KEY = "TRACKER_TARGET_TEMPLATE_INDEX_KEY"
-TRACKER_TARGET_NEGATIVE_IMAGE_KEY = "TRACKER_TARGET_NEGATIVE_IMAGE_KEY"
-TRACKER_TARGET_NEGATIVE_BBOX_KEY = "TRACKER_TARGET_NEGATIVE_BBOX_KEY"
-TRACKER_TARGET_AUX_IMAGE_KEY = "TRACKER_TARGET_AUX_IMAGE_KEY"
-TRACKER_TARGET_AUX_BBOX_KEY = "TRACKER_TARGET_AUX_BBOX_KEY"
-IMAGE_FILENAME_KEY = "IMAGE_FILENAME_KEY"
-DATASET_NAME_KEY = "DATASET_NAME_KEY"
-SAMPLE_INDEX_KEY = "SAMPLE_INDEX_KEY"
 
-# new additions
-SIMSIAM_SEARCH_OUT_KEY = "SIMSIAM_SEARCH_OUT_KEY"
 SIMSIAM_DYNAMIC_OUT_KEY = "SIMSIAM_DYNAMIC_OUT_KEY"
 
 class AEVTNet(nn.Module):
@@ -219,4 +198,8 @@ if __name__ == '__main__':
     gaussian_val = torch.randn((2,2,32,32))
     self_attention_features, cross_attention_features = model.SpatialSelfCrossAttention(search_features, dynamic_features)
     bbox_pred, cls_pred,_,_ =  model.connect_model(self_attention_features, cross_attention_features, template_features, gaussian_val=gaussian_val)
+    
+    simsiam_out_search = model.simsiam_forward(template_features, search_features)
+    simsiam_out_dynamic = model.simsiam_forward(template_features, dynamic_features)
+        
     print(bbox_pred, cls_pred)
