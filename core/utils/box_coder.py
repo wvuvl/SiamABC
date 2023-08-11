@@ -59,7 +59,8 @@ class AEVTBoxCoder(BoxCoder):
         """
         :param bboxes: torch.Tensor(batch, 4) - Boxes in xywh format
         :return: encoded_info: TrackerEncodeResult - regression_map: torch.Tensor(batch, 4, 32, 32),
-                                                     classification_label: torch.Tensor(batch, 1, 32, 32)
+                                                     classification_label: torch.Tensor(batch, 1, 32, 32
+                                                     )
         """
         bboxes = bboxes.unsqueeze(-1).unsqueeze(-1)
         left = self.grid_x - bboxes[:, 0]

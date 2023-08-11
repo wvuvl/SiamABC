@@ -53,7 +53,7 @@ class Encoder(nn.Module):
         return encoder_maps
 
 
-class SepConv(nn.Module):
+class ConvBlock(nn.Module):
     def __init__(
         self,
         in_channels: int,
@@ -216,13 +216,13 @@ class BoxTower(nn.Module):
 
         # box pred head
         for i in range(towernum):
-            tower.append(SepConv(outchannels, outchannels, kernel_size=3, stride=1, padding=1))
+            tower.append(ConvBlock(outchannels, outchannels, kernel_size=3, stride=1, padding=1))
             tower.append(nn.BatchNorm2d(outchannels))
             tower.append(nn.ReLU())
 
         # cls tower
         for i in range(towernum):
-            cls_tower.append(SepConv(outchannels, outchannels, kernel_size=3, stride=1, padding=1))
+            cls_tower.append(ConvBlock(outchannels, outchannels, kernel_size=3, stride=1, padding=1))
             cls_tower.append(nn.BatchNorm2d(outchannels))
             cls_tower.append(nn.ReLU())
 
@@ -230,8 +230,8 @@ class BoxTower(nn.Module):
         self.add_module("cls_tower", nn.Sequential(*cls_tower))
 
         # reg head
-        self.bbox_pred = SepConv(outchannels, 4, kernel_size=3, stride=1, padding=1)
-        self.cls_pred = SepConv(outchannels, 1, kernel_size=3, stride=1, padding=1)
+        self.bbox_pred = ConvBlock(outchannels, 4, kernel_size=3, stride=1, padding=1)
+        self.cls_pred = ConvBlock(outchannels, 1, kernel_size=3, stride=1, padding=1)
 
         # adjust scale
         self.adjust = nn.Parameter(0.1 * torch.ones(1))
@@ -267,7 +267,7 @@ class EncodeBackbone(nn.Module):
     def __init__(self, in_channels, out_channels, conv_block: str = "regular"):
         super().__init__()
         self.matrix11_s = nn.Sequential(
-            SepConv(in_channels, out_channels, kernel_size=3, bias=False, padding=1),
+            ConvBlock(in_channels, out_channels, kernel_size=3, bias=False, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
         )
@@ -289,7 +289,7 @@ class CorrelationConcat(nn.Module):
         if self.gaussian_map:  in_size = in_size + 2 # 2 chan gaussian map, 1 for t-2 and 2 for t-1 
         
         self.enc = nn.Sequential(
-            SepConv(in_size, num_channels, kernel_size=3, padding=1),
+            ConvBlock(in_size, num_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(num_channels),
             nn.ReLU(inplace=True),
         )
