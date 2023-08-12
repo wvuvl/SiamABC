@@ -6,6 +6,7 @@ from typing import Any, Dict
 import numpy as np
 import pandas as pd
 
+from utils import extend_bbox
 
 
 class TrackSampler(ABC):
@@ -31,6 +32,7 @@ class TrackSampler(ABC):
     def __len__(self) -> int:
         return len(self.epoch_data)
 
+    
     def _read_data(self) -> pd.DataFrame:
         data = pd.read_csv(self.data_path)
         negative = data[data["presence"] == 0]
@@ -53,6 +55,7 @@ class TrackSampler(ABC):
                 .reset_index(drop=True)
             )
 
+    # gets rid of the frames where the object does not exist or in the corner
     def parse_samples(self) -> None:
         self.data = self._read_data()
         self.template_data = self.data[(self.data["presence"] == 1) & (~self.data["near_corner"])]
@@ -65,7 +68,9 @@ class TrackSampler(ABC):
     
     extracting 4 samples,
     template: any
-    search: current search region, close to the 
+    search: current search region, anywhere in the frame
+    dynamic: frame before search region
+    prev_dynamic: frame before dynamic region
     
     """
     def extract_sample(self, idx: int) -> Dict[str, Any]:
@@ -75,11 +80,15 @@ class TrackSampler(ABC):
         search_index = random.choice(track_indices)
         search_item = self.data.iloc[search_index]
         
+        
+        
         search_items = self.data.iloc[track_indices]
+        
         dynamic_item = (
             search_items[
-                (search_items["frame_index"] > search_item["frame_index"] - self.frame_offset)
+                (search_items["frame_index"] > search_item["frame_index"] - int(self.frame_offset/2)) # if frame_offset == 70, it is only going tos earch for 35 frames since we also need to account for the previous dynamic frame 
                 & (search_items["frame_index"] <= search_item["frame_index"])
+                & (search_items["presence"] == 1) 
             ]
             .sample(1)
             .iloc[0]
@@ -87,16 +96,16 @@ class TrackSampler(ABC):
         
         prev_dynamic_item = (
             search_items[
-                (search_items["frame_index"] > dynamic_item["frame_index"] - self.frame_offset)
+                (search_items["frame_index"] > dynamic_item["frame_index"] - int(self.frame_offset/2))
                 & (search_items["frame_index"] <= dynamic_item["frame_index"])
+                & (search_items["presence"] == 1) 
             ]
             .sample(1)
             .iloc[0]
         )
-        
             
         
-        return dict(template=template_item, search=search_item, dynamic=dynamic_item, prev_dynamic_item=prev_dynamic_item)
+        return dict(template=template_item, search=search_item, dynamic=dynamic_item, prev_dynamic=prev_dynamic_item)
 
 if __name__ == '__main__':
     data_path = '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/core/dataset_utils/AVIST.csv'
