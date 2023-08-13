@@ -12,24 +12,17 @@ from typing import Dict, Tuple, Any, Tuple, List
 import torch
 import torch.nn as nn
 
-from blocks import Encoder, AdjustLayer, BoxTower, SpatialSelfCrossAttention
-TARGET_CLASSIFICATION_KEY = "TARGET_CLASSIFICATION_KEY"
-TARGET_REGRESSION_LABEL_KEY = "TARGET_REGRESSION_LABEL_KEY"
-SIMSIAM_SEARCH_OUT_KEY = "SIMSIAM_SEARCH_OUT_KEY"
-SIMSIAM_DYNAMIC_OUT_KEY = "SIMSIAM_DYNAMIC_OUT_KEY"
+# from blocks import Encoder, AdjustLayer, BoxTower, SpatialSelfCrossAttention
+# TARGET_CLASSIFICATION_KEY = "TARGET_CLASSIFICATION_KEY"
+# TARGET_REGRESSION_LABEL_KEY = "TARGET_REGRESSION_LABEL_KEY"
+# SIMSIAM_SEARCH_OUT_KEY = "SIMSIAM_SEARCH_OUT_KEY"
+# SIMSIAM_DYNAMIC_OUT_KEY = "SIMSIAM_DYNAMIC_OUT_KEY"
 
 
-# from models.blocks import Encoder, AdjustLayer, BoxTower, SpatialSelfCrossAttention
-# from utils.utils import make_grid
-# from utils.constants import (
-#     TARGET_REGRESSION_LABEL_KEY,
-#     TARGET_CLASSIFICATION_KEY,
-#     SIMSIAM_SEARCH_OUT_KEY,
-#     SIMSIAM_DYNAMIC_OUT_KEY   
-# )
+from models.blocks import Encoder, AdjustLayer, BoxTower, SpatialSelfCrossAttention
+from utils.utils import make_grid
+import constants 
 
-
-SIMSIAM_DYNAMIC_OUT_KEY = "SIMSIAM_DYNAMIC_OUT_KEY"
 
 class AEVTNet(nn.Module):
     def __init__(
@@ -161,10 +154,10 @@ class AEVTNet(nn.Module):
         simsiam_out_dynamic = self.simsiam_forward(template_features, dynamic_features)
         
         return {
-            TARGET_REGRESSION_LABEL_KEY: bbox_pred,
-            TARGET_CLASSIFICATION_KEY: cls_pred,
-            SIMSIAM_SEARCH_OUT_KEY: simsiam_out_search,
-            SIMSIAM_DYNAMIC_OUT_KEY: simsiam_out_dynamic
+            constants.TARGET_REGRESSION_LABEL_KEY: bbox_pred,
+            constants.TARGET_CLASSIFICATION_KEY: cls_pred,
+            constants.SIMSIAM_SEARCH_OUT_KEY: simsiam_out_search,
+            constants.SIMSIAM_DYNAMIC_OUT_KEY: simsiam_out_dynamic
         }
 
     def track(
@@ -181,8 +174,8 @@ class AEVTNet(nn.Module):
         bbox_pred, cls_pred =  self.connector(template_features=template_features, self_attention_features=self_attention_features, cross_attention_features=cross_attention_features, gaussian_val=gaussian_val)
         
         return {
-            TARGET_REGRESSION_LABEL_KEY: bbox_pred,
-            TARGET_CLASSIFICATION_KEY: cls_pred,
+            constants.TARGET_REGRESSION_LABEL_KEY: bbox_pred,
+            constants.TARGET_CLASSIFICATION_KEY: cls_pred,
         }
         
         

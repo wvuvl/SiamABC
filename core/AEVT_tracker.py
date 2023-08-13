@@ -16,9 +16,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+from utils.gaussian_map import gaussian_label_function
 from utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
 from utils.utils import to_device, limit, squared_size,  get_extended_crop, clamp_bbox
-from utils.constants import TARGET_CLASSIFICATION_KEY, TARGET_REGRESSION_LABEL_KEY
+import constants
 
 class TrackingState:
     def __init__(self) -> None:
@@ -26,6 +27,7 @@ class TrackingState:
         self.frame_h = 0
         self.frame_w = 0
         self.bbox: Optional[np.array] = None
+        self.prev_bbox: Optional[np.array] = None
         self.mapping: Optional[np.array] = None
         self.prev_size = None
         self.mean_color = None
@@ -46,6 +48,7 @@ class Tracker(ABC):
         self._template_features = None
         self._template_transform = self._get_default_transform(img_size=tracking_config["template_size"])
         self._search_transform = self._get_default_transform(img_size=tracking_config["instance_size"])
+        self._dynamic_transform = self._get_default_transform(img_size=tracking_config["instance_size"])
         self.window = self._get_tracking_window(tracking_config["windowing"], tracking_config["score_size"])
         self.to_device(cuda_id)
 
@@ -228,6 +231,7 @@ class AEVTTracker(Tracker):
                         x, y need to be 0-based
         """
         rect = clamp_bbox(rect, image.shape)
+        self.tracking_state.prev_bbox = rect
         self.tracking_state.bbox = rect
         self.tracking_state.paths = deque([rect], maxlen=10)
         self.tracking_state.mean_color = np.mean(image, axis=(0, 1))
@@ -243,41 +247,72 @@ class AEVTTracker(Tracker):
         img = self._preprocess_image(template_crop, self._template_transform)
         return self.net.get_features(img)
 
-    def update(self, image: np.ndarray, *kw) -> Dict[str, Any]:
+    def update(self, search: np.ndarray, dynamic: np.ndarray, prev_dynamic: np.ndarray, *kw) -> Dict[str, Any]:
         """
         args:
             img(np.ndarray): RGB image
         return:
             bbox(np.array):[x, y, width, height]
         """
-        search_crop, search_bbox, padded_bbox = get_extended_crop(
-            image=image,
+        
+        dynamic_crop, dynamic_bbox, dynamic_context = get_extended_crop(
+            image=dynamic,
             bbox=self.tracking_state.bbox,
             crop_size=self.tracking_config["instance_size"],
             offset=self.tracking_config["search_context"],
             padding_value=self.tracking_state.mean_color,
         )
-        self.tracking_state.mapping = padded_bbox
+        
+        prev_dynamic_crop, prev_dynamic_bbox, _ = get_extended_crop(
+            image=prev_dynamic,
+            bbox=self.tracking_state.prev_bbox,
+            crop_size=self.tracking_config["instance_size"],
+            offset=self.tracking_config["search_context"],
+            padding_value=self.tracking_state.mean_color,
+            context=dynamic_context
+        )
+        grid_size = self.tracking_config["regression_weight_label_size"] # 32 x 32
+        crop_size = self.tracking_config["instance_size"] # 256 x 256
+        dynamic_gaussian_label = gaussian_label_function(torch.tensor(dynamic_bbox).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
+        prev_dynamic_gaussian_label = gaussian_label_function(torch.tensor(prev_dynamic_bbox).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
+        gaussian_moving_map = torch.concat([prev_dynamic_gaussian_label, dynamic_gaussian_label], dim=0)
+    
+    
+        search_crop, search_bbox, search_context = get_extended_crop(
+            image=search,
+            bbox=self.tracking_state.bbox,
+            crop_size=self.tracking_config["instance_size"],
+            offset=self.tracking_config["search_context"],
+            padding_value=self.tracking_state.mean_color,
+            context=dynamic_context
+        )
+        self.tracking_state.mapping = search_context
         self.tracking_state.prev_size = search_bbox[2:]
-        pred_bbox, _ = self.track(search_crop)
+        
+        pred_bbox, pred_score = self.track(search_crop, dynamic_crop, gaussian_moving_map)
         pred_bbox = self._rescale_bbox(pred_bbox, self.tracking_state.mapping)
-        pred_bbox = clamp_bbox(pred_bbox, image.shape)
+        pred_bbox = clamp_bbox(pred_bbox, search.shape)
+        
+        self.tracking_state.prev_bbox = self.tracking_state.bbox
         self.tracking_state.bbox = pred_bbox
+        
         self.tracking_state.paths.append(pred_bbox)
-        return dict(bbox=pred_bbox)
+        return dict(bbox=pred_bbox, cls_score=pred_score)
 
-    def track(self, search_crop: np.ndarray):
+    def track(self, search_crop: np.ndarray, dynamic_crop: np.ndarray, gaussian_moving_map: torch.Tensor):
         search_crop = self._preprocess_image(search_crop, self._search_transform)
-        track_result = self.net.track(search_crop, self._template_features)
+        dynamic_crop = self._preprocess_image(search_crop, self._dynamic_transform)
+        
+        track_result = self.net.track(search=search_crop, dynamic=dynamic_crop, template_features=self._template_features, gaussian_val=gaussian_moving_map.unsqueeze(0))
         return self._postprocess(track_result=track_result)
 
     def _postprocess(self, track_result: Dict[str, torch.Tensor]) -> Tuple[np.array, float]:
-        cls_score = track_result[TARGET_CLASSIFICATION_KEY].detach().float().sigmoid()
-        regression_map = track_result[TARGET_REGRESSION_LABEL_KEY].detach().float()
+        cls_score = track_result[constants.TARGET_CLASSIFICATION_KEY].detach().float().sigmoid()
+        regression_map = track_result[constants.TARGET_REGRESSION_LABEL_KEY].detach().float()
         classification_map, penalty = self._confidence_postprocess(cls_score=cls_score, regression_map=regression_map)
         decoded_info: TrackerDecodeResult = self.box_coder.decode(
             classification_map=classification_map,
-            regression_map=track_result[TARGET_REGRESSION_LABEL_KEY],
+            regression_map=track_result[constants.TARGET_REGRESSION_LABEL_KEY],
             use_sigmoid=False,
         )
         cls_score = np.squeeze(cls_score)

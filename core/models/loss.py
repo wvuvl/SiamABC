@@ -3,11 +3,7 @@ from typing import Dict, Any, Optional
 import torch
 import torch.nn as nn
 
-from utils.constants import (
-    TARGET_REGRESSION_LABEL_KEY,
-    TARGET_REGRESSION_WEIGHT_KEY,
-    TARGET_CLASSIFICATION_KEY,
-)
+import constants
 
 
 def calc_iou(reg_target: torch.Tensor, pred: torch.Tensor, smooth: float = 1.0) -> torch.Tensor:
@@ -49,6 +45,7 @@ class AEVTLoss(nn.Module):
         super().__init__()
         self.classification_loss = nn.BCEWithLogitsLoss()
         self.regression_loss = BoxLoss()
+        self.cos_sim_loss = nn.CosineSimilarity(dim=1)
         self.coeffs = coeffs
 
     def _regression_loss(
@@ -85,14 +82,24 @@ class AEVTLoss(nn.Module):
 
     def forward(self, outputs: Dict[str, torch.Tensor], gt: Dict[str, Any]) -> Dict[str, Any]:
         regression_loss = self._regression_loss(
-            bbox_pred=outputs[TARGET_REGRESSION_LABEL_KEY],
-            reg_target=gt[TARGET_REGRESSION_LABEL_KEY],
-            reg_weight=gt[TARGET_REGRESSION_WEIGHT_KEY],
+            bbox_pred=outputs[constants.TARGET_REGRESSION_LABEL_KEY],
+            reg_target=gt[constants.TARGET_REGRESSION_LABEL_KEY],
+            reg_weight=gt[constants.TARGET_REGRESSION_WEIGHT_KEY],
         )
         classification_loss = self._classification_loss(
-            pred=outputs[TARGET_CLASSIFICATION_KEY], label=gt[TARGET_CLASSIFICATION_KEY]
+            pred=outputs[constants.TARGET_CLASSIFICATION_KEY], label=gt[constants.TARGET_CLASSIFICATION_KEY]
         )
+        
+        p1_search, p2_search, z1_search, z2_search = constants.SIMSIAM_SEARCH_OUT_KEY
+        cos_sim_loss_search = 1 - (self.cos_sim_loss(p1_search, z2_search).mean() + self.cos_sim_loss(p2_search, z1_search).mean()) * 0.5
+        
+        p1_dynamic, p2_dynamic, z1_dynamic, z2_dynamic = constants.SIMSIAM_DYNAMIC_OUT_KEY
+        cos_sim_loss_dynamic = 1 - (self.cos_sim_loss(p1_dynamic, z2_dynamic).mean() + self.cos_sim_loss(p2_dynamic, z1_dynamic).mean()) * 0.5
+        
+        
         return {
-            TARGET_CLASSIFICATION_KEY: classification_loss * self.coeffs[TARGET_CLASSIFICATION_KEY],
-            TARGET_REGRESSION_LABEL_KEY: regression_loss * self.coeffs[TARGET_REGRESSION_LABEL_KEY],
+            constants.TARGET_CLASSIFICATION_KEY: classification_loss * self.coeffs[constants.TARGET_CLASSIFICATION_KEY],
+            constants.TARGET_REGRESSION_LABEL_KEY: regression_loss * self.coeffs[constants.TARGET_REGRESSION_LABEL_KEY],
+            constants.SIMSIAM_SEARCH_OUT_KEY: cos_sim_loss_search,
+            constants.SIMSIAM_DYNAMIC_OUT_KEY: cos_sim_loss_dynamic
         }

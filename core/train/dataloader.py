@@ -17,7 +17,7 @@ from utils.gaussian_map import gaussian_label_function
 from preprocessing import BBoxCropWithOffsets, get_normalize_fn, TRACKING_AUGMENTATIONS, PHOTOMETRIC_AUGMENTATIONS
 from utils.box_coder import AEVTBoxCoder
 from utils.utils import handle_empty_bbox, read_img, ensure_bbox_boundaries, convert_center_to_bbox, get_extended_crop, get_regression_weight_label
-import utils.constants as constants
+import core.constants as constants
 
 
 def dummy_collate(batch: Any) -> Any:
