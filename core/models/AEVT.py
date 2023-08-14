@@ -20,7 +20,6 @@ import torch.nn as nn
 
 
 from models.blocks import Encoder, AdjustLayer, BoxTower, SpatialSelfCrossAttention
-from utils.utils import make_grid
 import constants 
 
 
@@ -30,15 +29,11 @@ class AEVTNet(nn.Module):
         simsiam_dim: int = 2048,
         simsiam_pred_dim: int = 512,
         pretrained: bool = True,
-        score_size: int = 25,
         adjust_channels: int = 256,
-        total_stride: int = 8,
-        instance_size: int = 255,
         towernum: int = 4,
         max_layer: int = 3,
-        crop_template_features: bool = True,
         conv_block: str = "regular",
-        gaussian_map: bool = False,
+        gaussian_map: bool = True,
         **kwargs,
     ) -> None:
         max_layer2name = {3: "layer2", 4: "layer1"}
@@ -85,16 +80,8 @@ class AEVTNet(nn.Module):
             gaussian_map=gaussian_map
         )
         
-        self.score_size = score_size
-        self.total_stride = total_stride
-        self.instance_size = instance_size
-        self.size = 1
+
         self.max_layer = max_layer
-        self.crop_template_features = crop_template_features
-        self.grid_x = torch.empty(0)
-        self.grid_y = torch.empty(0)
-        self.features = None
-        # self.grids(self.size)
 
     def feature_extractor(self, x: torch.Tensor) -> torch.Tensor:
         for stage in self.encoder.stages[: self.max_layer]:
@@ -105,14 +92,6 @@ class AEVTNet(nn.Module):
         features = self.feature_extractor(crop)
         features = self.neck(features)
         return features        
-        
-    # def grids(self, size: int) -> None:
-    #     """
-    #     each element of feature map on input search image
-    #     :return: H*W*2 (position for each element)
-    #     """
-    #     grid_x, grid_y = make_grid(self.score_size, self.total_stride, self.instance_size)
-    #     self.grid_x, self.grid_y = grid_x.unsqueeze(0).repeat(size, 1, 1, 1), grid_y.unsqueeze(0).repeat(size, 1, 1, 1)
 
     def connector(self, template_features: torch.Tensor, self_attention_features: torch.Tensor, cross_attention_features: torch.Tensor, gaussian_val: None or torch.Tensor) -> Dict[str, torch.Tensor]:
         bbox_pred, cls_pred, _, _ = self.connect_model(self_attention_features, cross_attention_features, template_features, gaussian_val=gaussian_val)

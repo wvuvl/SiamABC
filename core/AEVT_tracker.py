@@ -18,7 +18,7 @@ import torch.nn as nn
 
 from utils.gaussian_map import gaussian_label_function
 from utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
-from utils.utils import to_device, limit, squared_size,  get_extended_crop, clamp_bbox
+from utils.utils import to_device, limit, squared_size,  get_extended_crop, clamp_bbox, convert_xywh_to_xyxy
 import constants
 
 class TrackingState:
@@ -247,7 +247,7 @@ class AEVTTracker(Tracker):
         img = self._preprocess_image(template_crop, self._template_transform)
         return self.net.get_features(img)
 
-    def update(self, search: np.ndarray, dynamic: np.ndarray, prev_dynamic: np.ndarray, *kw) -> Dict[str, Any]:
+    def update(self, search: np.ndarray, dynamic: np.ndarray, prev_dynamic: np.ndarray or  None,*kw) -> Dict[str, Any]:
         """
         args:
             img(np.ndarray): RGB image
@@ -263,18 +263,21 @@ class AEVTTracker(Tracker):
             padding_value=self.tracking_state.mean_color,
         )
         
-        prev_dynamic_crop, prev_dynamic_bbox, _ = get_extended_crop(
-            image=prev_dynamic,
-            bbox=self.tracking_state.prev_bbox,
-            crop_size=self.tracking_config["instance_size"],
-            offset=self.tracking_config["search_context"],
-            padding_value=self.tracking_state.mean_color,
-            context=dynamic_context
-        )
-        grid_size = self.tracking_config["regression_weight_label_size"] # 32 x 32
-        crop_size = self.tracking_config["instance_size"] # 256 x 256
-        dynamic_gaussian_label = gaussian_label_function(torch.tensor(dynamic_bbox).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
-        prev_dynamic_gaussian_label = gaussian_label_function(torch.tensor(prev_dynamic_bbox).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
+        if prev_dynamic:
+            prev_dynamic_crop, prev_dynamic_bbox, _ = get_extended_crop(
+                image=prev_dynamic,
+                bbox=self.tracking_state.prev_bbox,
+                crop_size=self.tracking_config["instance_size"],
+                offset=self.tracking_config["search_context"],
+                padding_value=self.tracking_state.mean_color,
+                context=dynamic_context
+            )
+        else: prev_dynamic_bbox=dynamic_bbox
+        
+        grid_size = self.tracking_config["total_stride"]
+        crop_size = self.tracking_config["instance_size"]
+        dynamic_gaussian_label = gaussian_label_function(torch.tensor(convert_xywh_to_xyxy(dynamic_bbox)).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
+        prev_dynamic_gaussian_label = gaussian_label_function(torch.tensor(convert_xywh_to_xyxy(prev_dynamic_bbox)).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
         gaussian_moving_map = torch.concat([prev_dynamic_gaussian_label, dynamic_gaussian_label], dim=0)
     
     
@@ -297,13 +300,13 @@ class AEVTTracker(Tracker):
         self.tracking_state.bbox = pred_bbox
         
         self.tracking_state.paths.append(pred_bbox)
-        return dict(bbox=pred_bbox, cls_score=pred_score)
+        return pred_bbox, pred_score
 
     def track(self, search_crop: np.ndarray, dynamic_crop: np.ndarray, gaussian_moving_map: torch.Tensor):
         search_crop = self._preprocess_image(search_crop, self._search_transform)
-        dynamic_crop = self._preprocess_image(search_crop, self._dynamic_transform)
+        dynamic_crop = self._preprocess_image(dynamic_crop, self._dynamic_transform)
         
-        track_result = self.net.track(search=search_crop, dynamic=dynamic_crop, template_features=self._template_features, gaussian_val=gaussian_moving_map.unsqueeze(0))
+        track_result = self.net.track(search=search_crop, dynamic=dynamic_crop, template_features=self._template_features, gaussian_val=to_device(gaussian_moving_map, cuda_id=self.cuda_id).unsqueeze(0).float())
         return self._postprocess(track_result=track_result)
 
     def _postprocess(self, track_result: Dict[str, torch.Tensor]) -> Tuple[np.array, float]:

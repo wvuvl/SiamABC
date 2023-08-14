@@ -281,7 +281,7 @@ class CorrelationConcat(nn.Module):
     Mobile Correlation module
     """
 
-    def __init__(self, num_channels: int, num_corr_channels: int = 256, conv_block: str = "regular", gaussian_map=False):
+    def __init__(self, num_channels: int, num_corr_channels: int = 64, conv_block: str = "regular", gaussian_map=False):
         super().__init__()
         
         self.gaussian_map = gaussian_map
@@ -293,7 +293,7 @@ class CorrelationConcat(nn.Module):
             nn.BatchNorm2d(num_channels),
             nn.ReLU(inplace=True),
         )
-        self.weight = nn.Parameter(torch.empty(1, 2, 32, 32)) #gaussian map channels
+        self.weight = nn.Parameter(torch.empty(1, 2, 16, 16)) #gaussian map channels
         trunc_normal_(self.weight, std=.02)
         
     def forward(self, z, x, d, g=None):

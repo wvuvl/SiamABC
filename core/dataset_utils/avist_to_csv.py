@@ -20,10 +20,10 @@ def load_annotation_file_otb(ann_file):
     return bboxes
 
 
-video_dir = '/data/zaveri/dataset/avist/sequences'
-gt_dir = '/data/zaveri/dataset/avist/anno/'
-out_of_view = '/data/zaveri/dataset/avist/out_of_view'
-full_occlusions = '/data/zaveri/dataset/avist/full_occlusion'
+video_dir = '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/avist/sequences'
+gt_dir = '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/avist/anno/'
+out_of_view = '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/avist/out_of_view'
+full_occlusions = '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/avist/full_occlusion'
 
 data = []
 

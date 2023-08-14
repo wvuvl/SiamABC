@@ -5,7 +5,7 @@ from typing import Dict, Any, Union, Optional
 import numpy as np
 import torch
 
-from utils import unravel_index, make_grid
+from utils.utils import unravel_index, make_grid
 
 TrackerEncodeResult = namedtuple("TrackerEncodeResult", ["regression_map", "classification_label"])
 TrackerDecodeResult = namedtuple("TrackerDecodeResult", ["bbox", "pred_coords"])

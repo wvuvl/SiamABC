@@ -1,0 +1,17 @@
+# @package _global_
+
+hydra:
+  run:
+    dir: ../experiments/${now:%Y-%m-%d-%H-%M-%S}_Tracking_${experiment.name}
+
+defaults:
+  - backend: 1gpu
+  - dataset: avist_train
+  - model: AEVT
+  - loss: AEVT_loss
+  - optimizer: adam
+  - scheduler: plateau_max
+  - train_stage: tracker
+  - tracker: siam_tracker
+  - utility_overrides: none
+  - property_overrides: AEVT_tracker

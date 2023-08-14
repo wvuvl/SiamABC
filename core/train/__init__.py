@@ -12,21 +12,16 @@ from typing import Dict
 from torch.utils.data import ConcatDataset
 
 from utils import create_logger
-from dataloader import TrackingDataset, SequenceDatasetWrapper
+from train.dataloader import TrackingDataset, SequenceDatasetWrapper
 
 logger = create_logger(__name__)
-
-
-def get_tracking_dataset(config: Dict) -> TrackingDataset:
-    
-    cls = TrackingDataset[config["dataset"]["dataset_type"]]
-    return cls.from_config(config)
 
 
 def get_tracking_datasets(config) -> [ConcatDataset, ConcatDataset]:
     train_datasets = []
     for dataset_config in config["train"]["datasets"]:
-        ds = get_tracking_dataset(dict(dataset=dataset_config, tracker=config["tracker"]))
+        cls = TrackingDataset
+        ds = cls.from_config(dict(dataset=dataset_config, tracker=config["tracker"]))
         logger.info("Train dataset %s %d", str(ds), len(ds))
         train_datasets.append(ds)
 

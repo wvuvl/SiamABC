@@ -14,10 +14,10 @@ from torch.utils.data import Dataset
 from torch.utils.data.dataloader import default_collate
 
 from utils.gaussian_map import gaussian_label_function
-from preprocessing import BBoxCropWithOffsets, get_normalize_fn, TRACKING_AUGMENTATIONS, PHOTOMETRIC_AUGMENTATIONS
+from train.preprocessing import BBoxCropWithOffsets, get_normalize_fn, TRACKING_AUGMENTATIONS, PHOTOMETRIC_AUGMENTATIONS
 from utils.box_coder import AEVTBoxCoder
-from utils.utils import handle_empty_bbox, read_img, ensure_bbox_boundaries, convert_center_to_bbox, get_extended_crop, get_regression_weight_label
-import core.constants as constants
+from utils.utils import handle_empty_bbox, read_img, ensure_bbox_boundaries, convert_center_to_bbox, get_extended_crop, get_regression_weight_label, convert_xywh_to_xyxy
+import constants as constants
 
 
 def dummy_collate(batch: Any) -> Any:
@@ -181,9 +181,9 @@ class TrackingDataset(ABC):
             classification_label = torch.zeros(1, grid_size, grid_size)
             
         
-        dynamic_gaussian_label = gaussian_label_function(torch.tensor(dynamic_bbox).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
-        prev_dynamic_gaussian_label = gaussian_label_function(torch.tensor(prev_dynamic_bbox).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
-        gaussian_moving_map = torch.concat([prev_dynamic_gaussian_label, dynamic_gaussian_label], dim=0)
+        dynamic_gaussian_label = gaussian_label_function(torch.tensor(convert_xywh_to_xyxy(dynamic_bbox)).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
+        prev_dynamic_gaussian_label = gaussian_label_function(torch.tensor(convert_xywh_to_xyxy(prev_dynamic_bbox)).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
+        gaussian_moving_map = torch.concat([prev_dynamic_gaussian_label, dynamic_gaussian_label], dim=0).float()
     
         return {
             constants.TARGET_REGRESSION_LABEL_KEY: regression_map,

@@ -1,5 +1,5 @@
 from typing import Dict, Tuple, Any, List, Union, Callable, Iterable
-
+from tqdm import trange
 import cv2
 import numpy as np
 import torch
@@ -22,7 +22,7 @@ from models.loss import AEVTLoss
 from utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
 from utils.utils import read_img, get_iou
 from utils.logger import create_logger
-import core.constants as constants
+import constants as constants
 
 
 ####
@@ -232,9 +232,9 @@ class AEVTLightningModel(BaseLightningModel):
             failure_map = []
             dynamic_image = image_t_0
             prev_dynamic_image = image_t_0
-            for i in range(1, num_samples):
+            for i in trange(1, num_samples):
                 search_image = read_img(image_files[i])
-                bbox, cls_score = self.tracker.update(search=search_image, dynamic=dynamic_image, prev_dynamic=prev_dynamic_image)
+                bbox, cls_score = self.tracker.update(search=search_image, dynamic=dynamic_image, prev_dynamic=None)
                 iou = get_iou(np.array(bbox), np.array(list(map(int, annotations[i]))))
                 ious.append(iou)
                 failure_map.append(int(iou < _iou_threshold))

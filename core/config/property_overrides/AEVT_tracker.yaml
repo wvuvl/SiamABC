@@ -1,0 +1,4 @@
+# @package _global_
+experiment:
+  name: AEVT
+dataset_type: siam
