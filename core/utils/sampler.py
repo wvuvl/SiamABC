@@ -79,12 +79,31 @@ class TrackSampler(ABC):
         search_item = self.data.iloc[search_index]
         
         
-        
         search_items = self.data.iloc[track_indices]
         
+        # dynamic_items = (
+        #     search_items[
+        #         (search_items["frame_index"] <= search_item["frame_index"])
+        #         & (search_items["presence"] == 1) 
+        #     ]
+        #     .sort_values(by='frame_index', ascending=False)
+        # )
+        # dynamic_item =  dynamic_items.iloc[:2].sample(1).iloc[0] if len(dynamic_items) > 1 else dynamic_items.iloc[0]
+
+        
+        # prev_dynamic_items = (
+        #     search_items[
+        #         (search_items["frame_index"] <= dynamic_item["frame_index"])
+        #         & (search_items["presence"] == 1) 
+        #     ]
+        #     .sort_values(by='frame_index', ascending=False)
+        # )
+        
+        # prev_dynamic_item =  prev_dynamic_items.iloc[1] if len(prev_dynamic_items) > 1 else prev_dynamic_items.iloc[0]
+
         dynamic_item = (
             search_items[
-                (search_items["frame_index"] > search_item["frame_index"] - int(self.frame_offset/2)) # if frame_offset == 70, it is only going tos earch for 35 frames since we also need to account for the previous dynamic frame 
+                (search_items["frame_index"] > search_item["frame_index"] - self.frame_offset/2) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
                 & (search_items["frame_index"] <= search_item["frame_index"])
                 & (search_items["presence"] == 1) 
             ]
@@ -94,7 +113,7 @@ class TrackSampler(ABC):
         
         prev_dynamic_item = (
             search_items[
-                (search_items["frame_index"] > dynamic_item["frame_index"] - int(self.frame_offset/2))
+                (search_items["frame_index"] > dynamic_item["frame_index"] - self.frame_offset/2)
                 & (search_items["frame_index"] <= dynamic_item["frame_index"])
                 & (search_items["presence"] == 1) 
             ]

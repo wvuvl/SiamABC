@@ -221,8 +221,7 @@ def clamp_bbox(bbox: np.array, shape: Tuple[int, int], min_side: int = 3) -> np.
 ####
 ####
 def get_extended_crop(
-    image: np.array, bbox: np.array, crop_size: int, offset: float, padding_value: np.array = None, context: np.array = None
-) -> Tuple[np.array, np.array, np.array]:
+    image: np.array, bbox: np.array, crop_size: int, context: np.array, padding_value: np.array = None) -> Tuple[np.array, np.array, np.array]:
     """
     
     
@@ -243,8 +242,6 @@ def get_extended_crop(
         padding_value = np.mean(image, axis=(0, 1))
     bbox_params = {"format": "coco", "min_visibility": 0, "label_fields": ["category_id"], "min_area": 0}
     resize_aug = A.Compose([A.Resize(crop_size, crop_size)], bbox_params=bbox_params)
-    
-    context = extend_bbox(bbox, offset) if context is None else context # using pre-defined context for crops
     
     pad_left, pad_top = max(-context[0], 0), max(-context[1], 0)
     pad_right, pad_bottom = max(context[0] + context[2] - image.shape[1], 0), max(

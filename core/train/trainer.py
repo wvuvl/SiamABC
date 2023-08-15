@@ -59,12 +59,12 @@ def get_trainer(config: Dict[str, Any]) -> pl.Trainer:
         gradient_clip_val=config.get("gradient_clip_val", 0),
         val_check_interval=config.get("val_check_interval", 1.0),
         limit_train_batches=config.get("train_percent", 1.0),
-        limit_val_batches=config.get("val_percent", 1.0),
+        limit_val_batches=config.get("val_percent", 0.1),
         progress_bar_refresh_rate=config.get("progress_bar_refresh_rate", 10),
-        num_sanity_val_steps=config.get("sanity_steps", 5),
+        num_sanity_val_steps=config.get("sanity_steps", 1),
         log_every_n_steps=1,
         auto_lr_find=config.get("auto_lr", False),
         replace_sampler_ddp=config.get("replace_sampler_ddp", True),
-        check_val_every_n_epoch=config.get("check_val_every_n_epoch", 1),
+        check_val_every_n_epoch=config.get("check_val_every_n_epoch", 10),
     )
     return trainer

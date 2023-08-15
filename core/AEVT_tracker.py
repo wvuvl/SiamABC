@@ -18,7 +18,7 @@ import torch.nn as nn
 
 from utils.gaussian_map import gaussian_label_function
 from utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
-from utils.utils import to_device, limit, squared_size,  get_extended_crop, clamp_bbox, convert_xywh_to_xyxy
+from utils.utils import to_device, limit, squared_size,  get_extended_crop, clamp_bbox, convert_xywh_to_xyxy, extend_bbox
 import constants
 
 class TrackingState:
@@ -238,10 +238,11 @@ class AEVTTracker(Tracker):
         self._template_features = self.get_template_features(image, rect)
 
     def get_template_features(self, image, rect):
+        context = extend_bbox(rect, offset=self.tracking_config["template_bbox_offset"])
         template_crop, template_bbox, _ = get_extended_crop(
             image=image,
             bbox=rect,
-            offset=self.tracking_config["template_bbox_offset"],
+            context=context,
             crop_size=self.tracking_config["template_size"],
         )
         img = self._preprocess_image(template_crop, self._template_transform)
@@ -255,11 +256,13 @@ class AEVTTracker(Tracker):
             bbox(np.array):[x, y, width, height]
         """
         
+        context = extend_bbox(self.tracking_state.bbox, offset=self.tracking_config["search_context"])
+        
         dynamic_crop, dynamic_bbox, dynamic_context = get_extended_crop(
             image=dynamic,
             bbox=self.tracking_state.bbox,
             crop_size=self.tracking_config["instance_size"],
-            offset=self.tracking_config["search_context"],
+            context=context,
             padding_value=self.tracking_state.mean_color,
         )
         
@@ -268,7 +271,6 @@ class AEVTTracker(Tracker):
                 image=prev_dynamic,
                 bbox=self.tracking_state.prev_bbox,
                 crop_size=self.tracking_config["instance_size"],
-                offset=self.tracking_config["search_context"],
                 padding_value=self.tracking_state.mean_color,
                 context=dynamic_context
             )
@@ -285,7 +287,6 @@ class AEVTTracker(Tracker):
             image=search,
             bbox=self.tracking_state.bbox,
             crop_size=self.tracking_config["instance_size"],
-            offset=self.tracking_config["search_context"],
             padding_value=self.tracking_state.mean_color,
             context=dynamic_context
         )

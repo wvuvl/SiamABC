@@ -90,10 +90,10 @@ class AEVTLoss(nn.Module):
             pred=outputs[constants.TARGET_CLASSIFICATION_KEY], label=gt[constants.TARGET_CLASSIFICATION_KEY]
         )
         
-        p1_search, p2_search, z1_search, z2_search = constants.SIMSIAM_SEARCH_OUT_KEY
+        p1_search, p2_search, z1_search, z2_search = outputs[constants.SIMSIAM_SEARCH_OUT_KEY]
         cos_sim_loss_search = 1 - (self.cos_sim_loss(p1_search, z2_search).mean() + self.cos_sim_loss(p2_search, z1_search).mean()) * 0.5
         
-        p1_dynamic, p2_dynamic, z1_dynamic, z2_dynamic = constants.SIMSIAM_DYNAMIC_OUT_KEY
+        p1_dynamic, p2_dynamic, z1_dynamic, z2_dynamic = outputs[constants.SIMSIAM_DYNAMIC_OUT_KEY]
         cos_sim_loss_dynamic = 1 - (self.cos_sim_loss(p1_dynamic, z2_dynamic).mean() + self.cos_sim_loss(p2_dynamic, z1_dynamic).mean()) * 0.5
         
         
