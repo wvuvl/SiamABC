@@ -4,7 +4,7 @@ from typing import Dict, Any, List
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger, LightningLoggerBase
 
-from train.callbacks import ModelCheckpointCallback, EarlyStoppingCallback, BestWorstMinerCallback
+from core.train.callbacks import ModelCheckpointCallback, EarlyStoppingCallback, BestWorstMinerCallback
 
 
 def _init_logger(config: Dict[str, Any]) -> List[LightningLoggerBase]:
@@ -60,7 +60,7 @@ def get_trainer(config: Dict[str, Any]) -> pl.Trainer:
         val_check_interval=config.get("val_check_interval", 1.0),
         limit_train_batches=config.get("train_percent", 1.0),
         limit_val_batches=config.get("val_percent", 0.1),
-        progress_bar_refresh_rate=config.get("progress_bar_refresh_rate", 10),
+        progress_bar_refresh_rate=config.get("progress_bar_refresh_rate", 1),
         num_sanity_val_steps=config.get("sanity_steps", 1),
         log_every_n_steps=1,
         auto_lr_find=config.get("auto_lr", False),

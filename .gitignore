@@ -1,5 +1,9 @@
 src
 .vscode
 __pycache__
-AVIST.csv
 experiments
+*.csv
+*experiment*
+*.log
+models
+.hydra

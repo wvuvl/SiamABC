@@ -16,10 +16,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from utils.gaussian_map import gaussian_label_function
-from utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
-from utils.utils import to_device, limit, squared_size,  get_extended_crop, clamp_bbox, convert_xywh_to_xyxy, extend_bbox
-import constants
+from core.utils.gaussian_map import gaussian_label_function
+from core.utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
+from core.utils.utils import to_device, limit, squared_size,  get_extended_crop, clamp_bbox, convert_xywh_to_xyxy, extend_bbox
+import core.constants as constants
 
 class TrackingState:
     def __init__(self) -> None:
@@ -254,6 +254,7 @@ class AEVTTracker(Tracker):
             img(np.ndarray): RGB image
         return:
             bbox(np.array):[x, y, width, height]
+            clss_score
         """
         
         context = extend_bbox(self.tracking_state.bbox, offset=self.tracking_config["search_context"])
@@ -266,7 +267,7 @@ class AEVTTracker(Tracker):
             padding_value=self.tracking_state.mean_color,
         )
         
-        if prev_dynamic:
+        if prev_dynamic is not None:
             prev_dynamic_crop, prev_dynamic_bbox, _ = get_extended_crop(
                 image=prev_dynamic,
                 bbox=self.tracking_state.prev_bbox,

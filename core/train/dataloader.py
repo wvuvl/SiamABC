@@ -13,12 +13,12 @@ import torch
 from torch.utils.data import Dataset
 from torch.utils.data.dataloader import default_collate
 
-from utils.gaussian_map import gaussian_label_function
-from train.preprocessing import BBoxCropWithOffsets, get_normalize_fn, TRACKING_AUGMENTATIONS, PHOTOMETRIC_AUGMENTATIONS
-from utils.box_coder import AEVTBoxCoder
-from utils.utils import handle_empty_bbox, read_img, ensure_bbox_boundaries, convert_center_to_bbox, get_extended_crop, get_regression_weight_label, convert_xywh_to_xyxy, extend_bbox
-from utils.siamfc_preprocessing import convert_xywh_to_xyxy
-import constants as constants
+from core.utils.gaussian_map import gaussian_label_function
+from core.train.preprocessing import BBoxCropWithOffsets, get_normalize_fn, TRACKING_AUGMENTATIONS, PHOTOMETRIC_AUGMENTATIONS
+from core.utils.box_coder import AEVTBoxCoder
+from core.utils.utils import handle_empty_bbox, read_img, ensure_bbox_boundaries, convert_center_to_bbox, get_extended_crop, get_regression_weight_label, extend_bbox, convert_xywh_to_xyxy
+from core.utils.siamfc_preprocessing import convert_xywh_to_xyxy
+import core.constants as constants
 
 
 def dummy_collate(batch: Any) -> Any:
@@ -303,8 +303,8 @@ class TrackingDataset(ABC):
                 self.check_validity( convert_xywh_to_xyxy(dynamic_context), convert_xywh_to_xyxy(item_data["prev_dynamic_bbox"])): 
                     break
             else:
-                print(f"Object not within the search region, increasing the region by {100*context_factor}%")
-                context_factor += 1.0
+                # print(f"Object not within the search region, increasing the region by {100*context_factor}%")
+                context_factor *= 2.0
                 
         dynamic_crop, dynamic_bbox = self.get_search_transform(item_data["dynamic_image"], item_data["dynamic_bbox"], context=dynamic_context)
         search_crop, search_bbox = self.get_search_transform(item_data["search_image"], item_data["search_bbox"], context=dynamic_context)

@@ -17,21 +17,14 @@ from torchmetrics import MetricCollection
 from torchvision.ops import box_convert, box_iou
 
 
-from metrics import DatasetAwareMetric, BoxIoUMetric, TrackingFailureRateMetric, box_iou_metric
-from models.loss import AEVTLoss
-from utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
-from utils.utils import read_img, get_iou
-from utils.logger import create_logger
-import constants as constants
+from core.metrics import DatasetAwareMetric, BoxIoUMetric, TrackingFailureRateMetric, box_iou_metric
+from core.models.loss import AEVTLoss
+from core.utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
+from core.utils.utils import read_img, get_iou
+from core.utils.logger import create_logger
+import core.constants as constants
 
 
-####
-####
-####
-# TODO: make it work for dynamic search and gaussian map
-####
-####
-####
 
 
 logger = create_logger(__name__)
@@ -85,7 +78,7 @@ class BaseLightningModel(pl.LightningModule):
         return self.model(x)
 
     def configure_optimizers(self) -> Tuple[List[torch.optim.Optimizer], List[Dict[str, Any]]]:
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.01)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer,
                                                                mode=self.config.get("metric_mode", "min"),
                                                                factor=0.5,

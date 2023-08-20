@@ -98,11 +98,7 @@ class AdjustLayer(nn.Module):
         adjust = x_ori
         return adjust
 
-
-
-def Normalize(in_channels):
-    return torch.nn.GroupNorm(num_groups=32, num_channels=in_channels, eps=1e-6, affine=True)
-    
+ 
 class Attention(nn.Module):
     """
     modified from
@@ -146,8 +142,6 @@ class SpatialSelfCrossAttention(nn.Module):
     def __init__(self, in_channels):
         super().__init__()
         self.in_channels = in_channels
-
-        self.norm = Normalize(in_channels)
         
         self.attention = Attention(in_channels=in_channels)
         
@@ -175,7 +169,6 @@ class SpatialSelfCrossAttention(nn.Module):
         
         # spatial self-attention
         h_1 = x1
-        h_1 = self.norm(h_1)
         w_1 = self.attention(h_1)
         v = self.v(h_1)
         b,c,h,w = v.shape
@@ -184,7 +177,6 @@ class SpatialSelfCrossAttention(nn.Module):
         
         # spatial cross-attention
         h_2 = x2
-        h_2 = self.norm(h_2)
         w_2 = self.attention(h_2)
         h_12 = self.proc_attention(v, torch.nn.functional.softmax(w_1+w_2, dim=2), h)
 
@@ -237,18 +229,19 @@ class BoxTower(nn.Module):
         self.adjust = nn.Parameter(0.1 * torch.ones(1))
         self.bias = nn.Parameter(torch.Tensor(1.0 * torch.ones(1, 4, 1, 1)))
 
-    def forward(self, search, dynamic, kernel, update=None, gaussian_val=None):
+    def forward(self, search, dynamic, kernel, gaussian_val=None):
         # encode first
-        z = kernel.reshape(kernel.size(0), kernel.size(1), -1) if update is None else update.reshape(update.size(0), update.size(1), -1)
+        cls_z = kernel.reshape(kernel.size(0), kernel.size(1), -1)
         cls_x = self.cls_encode(search)  # [z11, z12, z13]
         cls_d = self.cls_encode(dynamic)
         
+        reg_z = kernel.reshape(kernel.size(0), kernel.size(1), -1)
         reg_x = self.reg_encode(search)  # [x11, x12, x13]
         reg_d = self.reg_encode(dynamic)
         
         # cls and reg DW
-        cls_dw = self.cls_dw(z, cls_x, cls_d, gaussian_val)
-        reg_dw = self.reg_dw(z, reg_x, reg_d, gaussian_val)
+        cls_dw = self.cls_dw(cls_z, cls_x, cls_d, gaussian_val)
+        reg_dw = self.reg_dw(reg_z, reg_x, reg_d, gaussian_val)
         x_reg = self.bbox_tower(reg_dw)
         x = self.adjust * self.bbox_pred(x_reg) + self.bias
         x = torch.exp(x)
@@ -278,7 +271,7 @@ class EncodeBackbone(nn.Module):
     
 class CorrelationConcat(nn.Module):
     """
-    Mobile Correlation module
+    Correlation module
     """
 
     def __init__(self, num_channels: int, num_corr_channels: int = 64, conv_block: str = "regular", gaussian_map=False):

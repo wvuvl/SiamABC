@@ -103,7 +103,7 @@ class TrackSampler(ABC):
 
         dynamic_item = (
             search_items[
-                (search_items["frame_index"] > search_item["frame_index"] - self.frame_offset/2) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
+                (search_items["frame_index"] > search_item["frame_index"] - self.frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
                 & (search_items["frame_index"] <= search_item["frame_index"])
                 & (search_items["presence"] == 1) 
             ]
@@ -113,7 +113,7 @@ class TrackSampler(ABC):
         
         prev_dynamic_item = (
             search_items[
-                (search_items["frame_index"] > dynamic_item["frame_index"] - self.frame_offset/2)
+                (search_items["frame_index"] > dynamic_item["frame_index"] - self.frame_offset/4)
                 & (search_items["frame_index"] <= dynamic_item["frame_index"])
                 & (search_items["presence"] == 1) 
             ]

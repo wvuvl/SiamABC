@@ -7,7 +7,7 @@ min_epochs: 100
 max_epochs: 500
 early_stopping: 20
 batch_size:
-  train: 32
+  train: 8
   val: 1
 num_workers: 4
 save_top_k: 3

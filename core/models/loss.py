@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional
 import torch
 import torch.nn as nn
 
-import constants
+import core.constants as constants
 
 
 def calc_iou(reg_target: torch.Tensor, pred: torch.Tensor, smooth: float = 1.0) -> torch.Tensor:
@@ -86,15 +86,20 @@ class AEVTLoss(nn.Module):
             reg_target=gt[constants.TARGET_REGRESSION_LABEL_KEY],
             reg_weight=gt[constants.TARGET_REGRESSION_WEIGHT_KEY],
         )
-        classification_loss = self._classification_loss(
-            pred=outputs[constants.TARGET_CLASSIFICATION_KEY], label=gt[constants.TARGET_CLASSIFICATION_KEY]
-        )
         
-        p1_search, p2_search, z1_search, z2_search = outputs[constants.SIMSIAM_SEARCH_OUT_KEY]
-        cos_sim_loss_search = 1 - (self.cos_sim_loss(p1_search, z2_search).mean() + self.cos_sim_loss(p2_search, z1_search).mean()) * 0.5
         
-        p1_dynamic, p2_dynamic, z1_dynamic, z2_dynamic = outputs[constants.SIMSIAM_DYNAMIC_OUT_KEY]
-        cos_sim_loss_dynamic = 1 - (self.cos_sim_loss(p1_dynamic, z2_dynamic).mean() + self.cos_sim_loss(p2_dynamic, z1_dynamic).mean()) * 0.5
+        cos_sim_loss_search = 0
+        cos_sim_loss_dynamic = 0
+        classification_loss = 0
+        # classification_loss = self._classification_loss(
+        #     pred=outputs[constants.TARGET_CLASSIFICATION_KEY], label=gt[constants.TARGET_CLASSIFICATION_KEY]
+        # )
+        
+        # p1_search, p2_search, z1_search, z2_search = outputs[constants.SIMSIAM_SEARCH_OUT_KEY]
+        # cos_sim_loss_search = 0.5 * (1 - (self.cos_sim_loss(p1_search, z2_search).mean() + self.cos_sim_loss(p2_search, z1_search).mean()) * 0.5)
+        
+        # p1_dynamic, p2_dynamic, z1_dynamic, z2_dynamic = outputs[constants.SIMSIAM_DYNAMIC_OUT_KEY]
+        # cos_sim_loss_dynamic = 0.5 * (1 - (self.cos_sim_loss(p1_dynamic, z2_dynamic).mean() + self.cos_sim_loss(p2_dynamic, z1_dynamic).mean()) * 0.5)
         
         
         return {

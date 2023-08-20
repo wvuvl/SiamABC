@@ -11,8 +11,8 @@ from typing import Dict
 
 from torch.utils.data import ConcatDataset
 
-from utils import create_logger
-from train.dataloader import TrackingDataset, SequenceDatasetWrapper
+from core.utils import create_logger
+from core.train.dataloader import TrackingDataset, SequenceDatasetWrapper
 
 logger = create_logger(__name__)
 

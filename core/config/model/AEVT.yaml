@@ -1,4 +1,4 @@
-_target_: models.AEVT.AEVTNet
+_target_: core.models.AEVT.AEVTNet
 backbone: custom_fbnet
 growth_factor: 1.2
 upsample: pixel_shuffle

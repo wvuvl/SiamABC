@@ -19,8 +19,8 @@ import torch.nn as nn
 # SIMSIAM_DYNAMIC_OUT_KEY = "SIMSIAM_DYNAMIC_OUT_KEY"
 
 
-from models.blocks import Encoder, AdjustLayer, BoxTower, SpatialSelfCrossAttention
-import constants 
+from core.models.blocks import Encoder, AdjustLayer, BoxTower, SpatialSelfCrossAttention
+import core.constants as constants
 
 
 class AEVTNet(nn.Module):
@@ -80,7 +80,7 @@ class AEVTNet(nn.Module):
             gaussian_map=gaussian_map
         )
         
-
+        self.gaussian_map = gaussian_map
         self.max_layer = max_layer
 
     def feature_extractor(self, x: torch.Tensor) -> torch.Tensor:
@@ -127,7 +127,7 @@ class AEVTNet(nn.Module):
         search_features = self.get_features(search)
         dynamic_features = self. get_features(dynamic)
         self_attention_features, cross_attention_features = self.SpatialSelfCrossAttention(search_features, dynamic_features)
-        bbox_pred, cls_pred =  self.connector(template_features=template_features, self_attention_features=self_attention_features, cross_attention_features=cross_attention_features, gaussian_val=gaussian_val)
+        bbox_pred, cls_pred =  self.connector(template_features=template_features, self_attention_features=self_attention_features, cross_attention_features=cross_attention_features, gaussian_val=gaussian_val if self.gaussian_map else None)
         
         simsiam_out_search = self.simsiam_forward(template_features, search_features)
         simsiam_out_dynamic = self.simsiam_forward(template_features, dynamic_features)
@@ -150,7 +150,7 @@ class AEVTNet(nn.Module):
         search_features = self.get_features(search)
         dynamic_features = self. get_features(dynamic)
         self_attention_features, cross_attention_features = self.SpatialSelfCrossAttention(search_features, dynamic_features)
-        bbox_pred, cls_pred =  self.connector(template_features=template_features, self_attention_features=self_attention_features, cross_attention_features=cross_attention_features, gaussian_val=gaussian_val)
+        bbox_pred, cls_pred =  self.connector(template_features=template_features, self_attention_features=self_attention_features, cross_attention_features=cross_attention_features, gaussian_val=gaussian_val if self.gaussian_map else None)
         
         return {
             constants.TARGET_REGRESSION_LABEL_KEY: bbox_pred,
@@ -167,7 +167,7 @@ if __name__ == '__main__':
     template_features = model.get_features(template)
     search_features = model.get_features(search)
     dynamic_features = model. get_features(dynamic)
-    gaussian_val = torch.randn((2,2,32,32))
+    gaussian_val = torch.randn((2,2,16,16))
     self_attention_features, cross_attention_features = model.SpatialSelfCrossAttention(search_features, dynamic_features)
     bbox_pred, cls_pred,_,_ =  model.connect_model(self_attention_features, cross_attention_features, template_features, gaussian_val=gaussian_val)
     

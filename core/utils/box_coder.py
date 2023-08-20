@@ -5,7 +5,7 @@ from typing import Dict, Any, Union, Optional
 import numpy as np
 import torch
 
-from utils.utils import unravel_index, make_grid
+from core.utils.utils import unravel_index, make_grid
 
 TrackerEncodeResult = namedtuple("TrackerEncodeResult", ["regression_map", "classification_label"])
 TrackerDecodeResult = namedtuple("TrackerDecodeResult", ["bbox", "pred_coords"])
@@ -29,8 +29,8 @@ class BoxCoder(ABC):
         """
 
         :param bboxes: np.array - [x, y, w, h]
-        :return: encoded_info: TrackerEncodeResult - regression_map: np.array(batch, 4, 32, 32),
-                                                     classification_label: np.array(batch, 1, 32, 32),
+        :return: encoded_info: TrackerEncodeResult - regression_map: np.array(batch, 4, 16, 16),
+                                                     classification_label: np.array(batch, 1, 16, 16),
         """
         pass
 
@@ -42,8 +42,8 @@ class BoxCoder(ABC):
         use_sigmoid: bool = True,
     ) -> TrackerDecodeResult:
         """
-        :param regression_map: torch.Tensor(batch, 4, 32, 32) - Regression output from a tracking net
-        :param classification_map: torch.Tensor(batch, 1, 32, 32) - Classification output from a tracking net
+        :param regression_map: torch.Tensor(batch, 4, 16, 16) - Regression output from a tracking net
+        :param classification_map: torch.Tensor(batch, 1, 16, 16) - Classification output from a tracking net
         :param use_sigmoid: torch.Tensor - Use sigmoid or not (for classification_labels we don`t need it)
         :return: decoded_info: TrackerDecodeResult - bbox, pred_coords
         """
@@ -58,8 +58,8 @@ class AEVTBoxCoder(BoxCoder):
     def encode(self, bboxes: torch.Tensor) -> TrackerEncodeResult:
         """
         :param bboxes: torch.Tensor(batch, 4) - Boxes in xywh format
-        :return: encoded_info: TrackerEncodeResult - regression_map: torch.Tensor(batch, 4, 32, 32),
-                                                     classification_label: torch.Tensor(batch, 1, 32, 32
+        :return: encoded_info: TrackerEncodeResult - regression_map: torch.Tensor(batch, 4, 16, 16),
+                                                     classification_label: torch.Tensor(batch, 1, 16, 16
                                                      )
         """
         bboxes = bboxes.unsqueeze(-1).unsqueeze(-1)
@@ -122,8 +122,8 @@ def get_box_coder(tracker_config: Dict[str, Any], tracker_name: str = "aevt") ->
 
 if __name__ == '__main__':
     tracker_config = {
-        "score_size": 32,
-        "total_stride": 8,
+        "score_size": 16,
+        "total_stride": 16,
         "instance_size": 256
     }
     

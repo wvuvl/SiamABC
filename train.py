@@ -5,10 +5,10 @@ import hydra
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 
-from train import get_tracking_datasets
-from train.AEVT_lightning_model import AEVTLightningModel
-from train.trainer import get_trainer
-from utils import prepare_experiment, create_logger
+from core.train import get_tracking_datasets
+from core.train.AEVT_lightning_model import AEVTLightningModel
+from core.train.trainer import get_trainer
+from core.utils import prepare_experiment, create_logger
 
 logger = create_logger(__name__)
 warnings.filterwarnings("ignore")
@@ -22,7 +22,7 @@ def train(config: Dict[str, Any]) -> None:
     trainer.fit(model)
 
 
-@hydra.main(config_name="AEVT_tracker", config_path="config")
+@hydra.main(config_name="AEVT_tracker", config_path="core/config")
 def run_experiment(hydra_config: DictConfig) -> None:
     config = prepare_experiment(hydra_config)
     logger.info("Experiment dir %s" % config["experiment"]["folder"])

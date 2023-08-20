@@ -25,7 +25,7 @@ def gauss_2d(sz, sigma, center, end_pad=(0, 0), density=False) -> torch.Tensor:
            gauss_1d(sz[1].item(), sigma[1], center[:, 1], end_pad[1], density).reshape(center.shape[0], -1, 1)
 
 
-def gaussian_label_function(target_bb, sigma_factor=0.1, kernel_sz=1, feat_sz=32, image_sz=256, end_pad_if_even=True, density=False, uni_bias=0) -> torch.Tensor:
+def gaussian_label_function(target_bb, sigma_factor=0.1, kernel_sz=1, feat_sz=16, image_sz=256, end_pad_if_even=True, density=False, uni_bias=0) -> torch.Tensor:
     """Construct Gaussian label function.
     target_bb: [b x [x1,y1,x2,y2]]
     

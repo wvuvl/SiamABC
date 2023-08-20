@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 import torch
 from pytorch_lightning.callbacks import Callback, ModelCheckpoint, EarlyStopping
 
-from utils.torch_stuff import any2device, evaluating
+from core.utils.torch_stuff import any2device, evaluating
 
 
 class BaseCallback(Callback, ABC):

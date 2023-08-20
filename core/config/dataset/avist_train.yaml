@@ -13,7 +13,7 @@ sizes:
   upscale_factor: 2
   context_range: 3
 
-frame_offset: 70
+frame_offset: 60
 negative_ratio: 0
 # clip_range: True
 
@@ -21,19 +21,19 @@ dynamic_frame_offset:
   start_epoch: 20
   freq: 5
   step: 5
-  max_value: 150
+  max_value: 60
 
 train:
   datasets:
     - dataset_type: ${dataset_type}
       root: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/avist
       sampling:
-        _target_: utils.sampler.TrackSampler
+        _target_: core.utils.sampler.TrackSampler
         data_path: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/AVIST.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         # clip_range: ${clip_range}
-        num_samples: 256 # 100000
+        num_samples: 1000 # 100000
       transform: photometric
       regression_weight_label_size: ${tracker.score_size}
       sizes: ${sizes}
