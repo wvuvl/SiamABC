@@ -2,7 +2,7 @@ import random
 from abc import ABC
 from math import ceil
 from typing import Any, Dict
-
+from tqdm import trange, tqdm
 import numpy as np
 import pandas as pd
 
@@ -31,6 +31,17 @@ class TrackSampler(ABC):
         return len(self.epoch_data)
 
     
+    def drop_bad_bboxes(self, data):
+        bboxes = data["bbox"]
+        indexes = []
+        for idx, bbox in enumerate(bboxes):
+            x,y,w,h = eval(bbox)
+            if (x+w) <= x+15 or (y+h) <= y+15 or w==0 or h==0:
+                indexes.append(idx)
+        data = data.drop(indexes)
+        data = data.reset_index(drop=True)
+        return data 
+        
     def _read_data(self) -> pd.DataFrame:
         data = pd.read_csv(self.data_path)
         negative = data[data["presence"] == 0]
@@ -40,6 +51,7 @@ class TrackSampler(ABC):
         dropped_negatives = np.random.choice(negative.index, num_neg_samples_to_drop, replace=False)
         data = data.drop(dropped_negatives)
         data = data.reset_index(drop=True)
+        data = self.drop_bad_bboxes(data)
         return data
 
     def resample(self) -> None:
@@ -74,36 +86,14 @@ class TrackSampler(ABC):
     def extract_sample(self, idx: int) -> Dict[str, Any]:
         template_item = self.epoch_data.iloc[idx]
         track_indices = self.mapping[template_item["track_id"]]
-        
-        search_index = random.choice(track_indices)
-        search_item = self.data.iloc[search_index]
-        
-        
+                
         search_items = self.data.iloc[track_indices]
         
-        # dynamic_items = (
-        #     search_items[
-        #         (search_items["frame_index"] <= search_item["frame_index"])
-        #         & (search_items["presence"] == 1) 
-        #     ]
-        #     .sort_values(by='frame_index', ascending=False)
-        # )
-        # dynamic_item =  dynamic_items.iloc[:2].sample(1).iloc[0] if len(dynamic_items) > 1 else dynamic_items.iloc[0]
-
-        
-        # prev_dynamic_items = (
-        #     search_items[
-        #         (search_items["frame_index"] <= dynamic_item["frame_index"])
-        #         & (search_items["presence"] == 1) 
-        #     ]
-        #     .sort_values(by='frame_index', ascending=False)
-        # )
-        
-        # prev_dynamic_item =  prev_dynamic_items.iloc[1] if len(prev_dynamic_items) > 1 else prev_dynamic_items.iloc[0]
+        search_item = (search_items[(search_items["presence"] == 1)].sample(1).iloc[0])
 
         dynamic_item = (
             search_items[
-                (search_items["frame_index"] > search_item["frame_index"] - self.frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
+                (search_items["frame_index"] > search_item["frame_index"] - 3) #- self.frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
                 & (search_items["frame_index"] <= search_item["frame_index"])
                 & (search_items["presence"] == 1) 
             ]
@@ -113,7 +103,7 @@ class TrackSampler(ABC):
         
         prev_dynamic_item = (
             search_items[
-                (search_items["frame_index"] > dynamic_item["frame_index"] - self.frame_offset/4)
+                (search_items["frame_index"] > dynamic_item["frame_index"] - 3) #- self.frame_offset/4)
                 & (search_items["frame_index"] <= dynamic_item["frame_index"])
                 & (search_items["presence"] == 1) 
             ]
@@ -125,7 +115,22 @@ class TrackSampler(ABC):
         return dict(template=template_item, search=search_item, dynamic=dynamic_item, prev_dynamic=prev_dynamic_item)
 
 if __name__ == '__main__':
-    data_path = '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/core/dataset_utils/AVIST.csv'
-    sampler = TrackSampler(data_path,negative_ratio=1.,frame_offset=70,num_samples=20000)
-    sampler.parse_samples()
-    samples = sampler.extract_sample(12)
+    import time
+    # from utils import read_img
+    
+
+    # data_path = '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/AVIST.csv'
+    # sampler = TrackSampler(data_path,negative_ratio=1.,frame_offset=70,num_samples=20000)
+    # sampler.parse_samples()
+    
+    # start = time.time()
+    # # for i in trange(78000):
+    # #     samples = sampler.extract_sample(12)
+    # #     template_image = read_img(samples["template"]["img_path"])
+    # #     search_image = read_img(samples["search"]["img_path"])
+    # #     dynamic_image = read_img(samples["dynamic"]["img_path"])
+    # #     prev_dynamic_image = read_img(samples["prev_dynamic"]["img_path"])
+    # samples = sampler.data["img_path"]    
+    # for i in tqdm(samples):
+    #     prev_dynamic_image = read_img(i)    
+    # print(time.time()-start)

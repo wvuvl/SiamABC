@@ -17,7 +17,6 @@ from core.utils.gaussian_map import gaussian_label_function
 from core.train.preprocessing import BBoxCropWithOffsets, get_normalize_fn, TRACKING_AUGMENTATIONS, PHOTOMETRIC_AUGMENTATIONS
 from core.utils.box_coder import AEVTBoxCoder
 from core.utils.utils import handle_empty_bbox, read_img, ensure_bbox_boundaries, convert_center_to_bbox, get_extended_crop, get_regression_weight_label, extend_bbox, convert_xywh_to_xyxy
-from core.utils.siamfc_preprocessing import convert_xywh_to_xyxy
 import core.constants as constants
 
 
@@ -217,6 +216,7 @@ class TrackingDataset(ABC):
             context=context
         )
         
+        
         bbox_crop = convert_center_to_bbox(
             [
                 crop.shape[0] // 2,
@@ -244,7 +244,7 @@ class TrackingDataset(ABC):
 
     def get_template_transform(self, image: np.array, bbox: np.array) -> Tuple[np.array, np.array]:
         template_size = self.sizes_config["template_image_size"]
-        context = extend_bbox(bbox, offset=self.sizes_config["template_bbox_offset"])
+        context = extend_bbox(bbox, offset=self.sizes_config["template_bbox_offset"], image_width=image.shape[1], image_height=image.shape[0])
         crop, bbox, _ = get_extended_crop(
             image=image,
             bbox=bbox,
@@ -287,24 +287,24 @@ class TrackingDataset(ABC):
         return image, bbox
 
     def check_validity(self, bbox_window, bbox):
-        return bbox[0]>bbox_window[0] and bbox[1]>bbox_window[1] and bbox[2]<bbox_window[2] and bbox[3]<bbox_window[3]
+        return bbox[0]>=bbox_window[0] and bbox[1]>=bbox_window[1] and bbox[2]<=bbox_window[2] and bbox[3]<=bbox_window[3]
         
     def _get_crops(self, item_data):
         template_crop, template_bbox = self.get_template_transform(
-            item_data["template_image"], item_data["template_bbox"]
+            item_data["template_image"], item_data["template_bbox"], 
         )
         
         context_factor = 2.0
         while True:
             offset=(random.random() * 0.5) + context_factor
-            dynamic_context = extend_bbox(item_data["dynamic_bbox"], offset)
+            dynamic_context = extend_bbox(item_data["dynamic_bbox"], image_width=item_data["dynamic_image"].shape[1], image_height=item_data["dynamic_image"].shape[0], offset=offset)
             
             if self.check_validity( convert_xywh_to_xyxy(dynamic_context), convert_xywh_to_xyxy(item_data["search_bbox"])) and \
                 self.check_validity( convert_xywh_to_xyxy(dynamic_context), convert_xywh_to_xyxy(item_data["prev_dynamic_bbox"])): 
                     break
             else:
                 # print(f"Object not within the search region, increasing the region by {100*context_factor}%")
-                context_factor *= 2.0
+                context_factor += 2.0
                 
         dynamic_crop, dynamic_bbox = self.get_search_transform(item_data["dynamic_image"], item_data["dynamic_bbox"], context=dynamic_context)
         search_crop, search_bbox = self.get_search_transform(item_data["search_image"], item_data["search_bbox"], context=dynamic_context)

@@ -9,7 +9,7 @@ ratio: 0.94
 stride: ${model.stride}
 
 bbox_ratio: 0.5
-template_bbox_offset: 0.2
+template_bbox_offset: 1.2
 search_context: 2
 instance_size: 256
 template_size: 128

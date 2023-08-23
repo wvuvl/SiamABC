@@ -4,6 +4,7 @@ import cv2
 import imageio.v3 as iio
 import numpy as np
 from fire import Fire
+from tqdm import tqdm
 from hydra.utils import instantiate
 from typing import Optional, List
 
@@ -33,7 +34,7 @@ def track(tracker: AEVTTracker, frames: List[np.ndarray], initial_bbox: np.ndarr
     dynamic_frame = frames[0]
     prev_dynamic_frame = frames[0]
     
-    for idx, frame in enumerate(frames[1:]):
+    for idx, frame in tqdm(enumerate(frames[1:])):
         
         tracked_bbox,cls_score = tracker.update(frame,dynamic_frame,prev_dynamic_frame)
         tracked_bboxes.append(tracked_bbox)
@@ -44,6 +45,7 @@ def track(tracker: AEVTTracker, frames: List[np.ndarray], initial_bbox: np.ndarr
         bbox = tracked_bboxes[idx+1]
         bbox = [bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]]
         frame_w_rec = cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 0), 2)
+        # print()
     return tracked_bboxes
 
 
@@ -61,12 +63,12 @@ def visualize(frames: List[np.ndarray], tracked_bboxes: List[np.ndarray]):
 
 import os
 def main(
-    initial_bbox: List[int] = [163, 53, 45, 174],
-    video_path: str = "assets/test.mp4",
-    output_path: str = "outputs/test.mp4",
+    initial_bbox: List[int] = [489, 188, 497, 140],
+    video_path: str = "assets/airplane_in_rain.mp4",
+    output_path: str = "outputs/airplane_in_rain.mp4",
     config_path: str = "core/config",
     config_name: str = "AEVT_tracker",
-    weights_path: str = "models/small/epoch_0019-valid_metrics_box_iou_0.0009_no_gauss.ckpt",
+    weights_path: str = "/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/experiments/2023-08-22-12-26-28_Tracking_AEVT/AEVT/trained_model_ckpt_7.pt",
 ):
     tracker = get_tracker(config_path=config_path, config_name=config_name, weights_path=weights_path)
     video, metadata = iio.imread(video_path), iio.immeta(video_path, exclude_applied=False)

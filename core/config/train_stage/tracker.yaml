@@ -3,13 +3,14 @@ phase: train
 task: Visual Object Tracking
 
 sampler: none
+lr: 0.0001
 min_epochs: 100
-max_epochs: 500
+max_epochs: 150
 early_stopping: 20
 batch_size:
   train: 8
   val: 1
-num_workers: 4
+num_workers: 8
 save_top_k: 3
 
 parallel: False

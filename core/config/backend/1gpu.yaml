@@ -1,5 +1,10 @@
 # @package _global_
-num_workers: 0
-accelerator:
+num_workers: 8
+ddp: True
 gpus: [ 0 ]
 precision: 32
+world_size: 1
+rank: 0
+dist_url: "tcp://localhost:10002"
+dist_backend: "nccl"
+sync_bn: True

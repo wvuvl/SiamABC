@@ -238,7 +238,7 @@ class AEVTTracker(Tracker):
         self._template_features = self.get_template_features(image, rect)
 
     def get_template_features(self, image, rect):
-        context = extend_bbox(rect, offset=self.tracking_config["template_bbox_offset"])
+        context = extend_bbox(rect, offset=self.tracking_config["template_bbox_offset"], image_width=image.shape[1], image_height=image.shape[0])
         template_crop, template_bbox, _ = get_extended_crop(
             image=image,
             bbox=rect,
@@ -257,7 +257,7 @@ class AEVTTracker(Tracker):
             clss_score
         """
         
-        context = extend_bbox(self.tracking_state.bbox, offset=self.tracking_config["search_context"])
+        context = extend_bbox(self.tracking_state.bbox, offset=self.tracking_config["search_context"], image_width=dynamic.shape[1], image_height=dynamic.shape[0])
         
         dynamic_crop, dynamic_bbox, dynamic_context = get_extended_crop(
             image=dynamic,

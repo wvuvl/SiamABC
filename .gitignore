@@ -7,3 +7,7 @@ experiments
 *.log
 models
 .hydra
+*.mp4
+hardcopy.0
+test.txt
+airplane_in_rain.txt

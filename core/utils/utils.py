@@ -2,8 +2,12 @@ from typing import Tuple, Dict, Any, List, Union, Optional
 import random
 import torch
 import cv2
+import os
 import numpy as np
 import albumentations as A
+import matplotlib.pyplot as plt
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 BBox = Union[List, np.array]
 
@@ -26,7 +30,7 @@ def get_iou(bb1: np.array, bb2: np.array) -> float:
     return iou
 
 
-def extend_bbox(bbox: np.array, offset: Union[Tuple[float, ...], float] = 0.1) -> np.array:
+def extend_bbox(bbox: np.array, image_width, image_height, offset: float = 1.1) -> np.array:
     """
     Increases bbox dimensions by offset*100 percent on each side.
 
@@ -42,19 +46,49 @@ def extend_bbox(bbox: np.array, offset: Union[Tuple[float, ...], float] = 0.1) -
 
     :return: extended bbox, [x_new, y_new, w_new, h_new]
     """
-    x, y, w, h = bbox
 
-    if isinstance(offset, tuple):
-        if len(offset) == 4:
-            left, right, top, bottom = offset
-        elif len(offset) == 2:
-            w_offset, h_offset = offset
-            left = right = w_offset
-            top = bottom = h_offset
-    else:
-        left = right = top = bottom = offset
+    bbox_center_x = bbox[0]+(bbox[2]/2)
+    bbox_center_y = bbox[1]+(bbox[3]/2)
+    
+    # Padded output width and height
+    output_width = max(1.0, offset * bbox[2])
+    output_height = max(1.0, offset * bbox[3])
 
-    return np.array([x - w * left, y - h * top, w * (1.0 + right + left), h * (1.0 + top + bottom)]).astype("int32")
+    roi_left = max(0.0, bbox_center_x - (output_width / 2.))
+    roi_bottom = max(0.0, bbox_center_y - (output_height / 2.))
+
+    # New ROI width
+    # -------------
+    # 1. left_half should not go out of bound on the left side of the
+    # image
+    # 2. right_half should not go out of bound on the right side of the
+    # image
+    left_half = min(output_width / 2., bbox_center_x)
+    right_half = min(output_width / 2., image_width - bbox_center_x)
+    roi_width = max(1.0, left_half + right_half)
+
+    # New ROI height
+    # Similar logic applied that is applied for 'New ROI width'
+    top_half = min(output_height / 2., bbox_center_y)
+    bottom_half = min(output_height / 2., image_height - bbox_center_y)
+    roi_height = max(1.0, top_half + bottom_half)
+
+    # Padded image location in the original image
+    return np.array([roi_left, roi_bottom, roi_width, roi_height]).astype("int32")
+        
+    # if isinstance(offset, tuple):
+    #     if len(offset) == 4:
+    #         left, right, top, bottom = offset
+    #     elif len(offset) == 2:
+    #         w_offset, h_offset = offset
+    #         left = right = w_offset
+    #         top = bottom = h_offset
+    # else:
+    #     left = right = top = bottom = offset
+        
+    
+
+    # return np.array([x - w * left, y - h * top, w * (1.0 + right + left), h * (1.0 + top + bottom)]).astype("int32")
 
 
 def ensure_bbox_boundaries(bbox: np.array, img_shape: Tuple[int, int]) -> np.array:
@@ -424,12 +458,16 @@ def read_img(path: str) -> np.array:
         path: image path
     Returns: image
     """
-    img = cv2.imread(path)
-    # print(path)
-    # print(img.shape)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) if len(img.shape) == 3 else cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
     
-    return img.copy()
+    im = Image.open(path)
+    return np.asarray(im)
+
+    # img = cv2.imread(path)
+    # # print(path)
+    # # print(img.shape)
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) if len(img.shape) == 3 else cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+    
+    # return img.copy()
 
 
 def get_max_side_near_bbox(bbox: np.array, frame: np.array) -> Tuple[np.array, str]:
@@ -488,15 +526,8 @@ def get_negative_crop(bbox: np.array, image: np.array) -> np.array:
 
 
 def convert_xywh_to_xyxy(bbox: np.array) -> np.array:
-    """
-    Args:
-        bbox: in xywh format
-    Returns:
-        bbox: in xyxy format
-    """
-    bbox[2] += bbox[0]
-    bbox[3] += bbox[1]
-    return bbox
+    return np.array([bbox[0], bbox[1], bbox[2]+bbox[0], bbox[3]+bbox[1]])
+
 
 
 def convert_bbox_to_center(bbox: np.array) -> np.array:
@@ -539,3 +570,20 @@ def handle_empty_bbox(bbox: np.array, min_bbox: int = 3) -> np.array:
     bbox[2] = max(bbox[2], min_bbox)
     bbox[3] = max(bbox[3], min_bbox)
     return bbox
+
+def plot_loss(train_losses, results_dir, val_ious=None):
+    plt.figure()
+    x_range = np.arange(1, len(train_losses)+1)
+    plt.plot(x_range, train_losses)    
+    plt.title('Training Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Combined Losses')
+    plt.savefig(os.path.join(results_dir, 'Training Losses'))
+    
+    if val_ious is not None:
+        x_range = np.arange(1, len(val_ious)+1)
+        plt.plot(x_range, val_ious)
+        plt.title('Validation IoUs')
+        plt.xlabel('Epoch')
+        plt.ylabel('IoUs')
+        plt.savefig(os.path.join(results_dir, 'Validation IoUs'))
