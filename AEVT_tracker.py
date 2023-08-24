@@ -18,7 +18,7 @@ import torch.nn as nn
 
 from core.utils.gaussian_map import gaussian_label_function
 from core.utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
-from core.utils.utils import to_device, limit, squared_size,  get_extended_crop, clamp_bbox, convert_xywh_to_xyxy, extend_bbox
+from core.utils.utils import to_device, limit, squared_size,  get_extended_image_crop, get_scaled_crop_bbox, clamp_bbox, convert_xywh_to_xyxy, extend_bbox
 import core.constants as constants
 
 class TrackingState:
@@ -239,12 +239,20 @@ class AEVTTracker(Tracker):
 
     def get_template_features(self, image, rect):
         context = extend_bbox(rect, offset=self.tracking_config["template_bbox_offset"], image_width=image.shape[1], image_height=image.shape[0])
-        template_crop, template_bbox, _ = get_extended_crop(
+        
+        template_crop, context = get_extended_image_crop(
             image=image,
-            bbox=rect,
-            context=context,
             crop_size=self.tracking_config["template_size"],
+            context=context
         )
+        
+        template_bbox, context = get_scaled_crop_bbox(
+            bbox=rect,
+            crop_size=self.tracking_config["template_size"],
+            context=context
+        )
+        
+        
         img = self._preprocess_image(template_crop, self._template_transform)
         return self.net.get_features(img)
 
@@ -259,38 +267,45 @@ class AEVTTracker(Tracker):
         
         context = extend_bbox(self.tracking_state.bbox, offset=self.tracking_config["search_context"], image_width=dynamic.shape[1], image_height=dynamic.shape[0])
         
-        dynamic_crop, dynamic_bbox, dynamic_context = get_extended_crop(
+        dynamic_crop, dynamic_context = get_extended_image_crop(
             image=dynamic,
-            bbox=self.tracking_state.bbox,
             crop_size=self.tracking_config["instance_size"],
             context=context,
-            padding_value=self.tracking_state.mean_color,
+            padding_value=self.tracking_state.mean_color
         )
+        dynamic_bbox, dynamic_context = get_scaled_crop_bbox(
+            bbox=self.tracking_state.bbox,
+            crop_size=self.tracking_config["instance_size"],
+            context=context)
+        
         
         if prev_dynamic is not None:
-            prev_dynamic_crop, prev_dynamic_bbox, _ = get_extended_crop(
-                image=prev_dynamic,
+            prev_dynamic_bbox, _ = get_scaled_crop_bbox(
                 bbox=self.tracking_state.prev_bbox,
                 crop_size=self.tracking_config["instance_size"],
-                padding_value=self.tracking_state.mean_color,
-                context=dynamic_context
-            )
-        else: prev_dynamic_bbox=dynamic_bbox
+                context=dynamic_context)
+        else: 
+            prev_dynamic_bbox=dynamic_bbox
         
         grid_size = self.tracking_config["total_stride"]
         crop_size = self.tracking_config["instance_size"]
         dynamic_gaussian_label = gaussian_label_function(torch.tensor(convert_xywh_to_xyxy(dynamic_bbox)).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
         prev_dynamic_gaussian_label = gaussian_label_function(torch.tensor(convert_xywh_to_xyxy(prev_dynamic_bbox)).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
         gaussian_moving_map = torch.concat([prev_dynamic_gaussian_label, dynamic_gaussian_label], dim=0)
-    
-    
-        search_crop, search_bbox, search_context = get_extended_crop(
+
+        
+        search_crop, search_context = get_extended_image_crop(
             image=search,
+            crop_size=self.tracking_config["instance_size"],
+            context=dynamic_context,
+            padding_value=self.tracking_state.mean_color
+        )
+        search_bbox, search_context = get_scaled_crop_bbox(
             bbox=self.tracking_state.bbox,
             crop_size=self.tracking_config["instance_size"],
-            padding_value=self.tracking_state.mean_color,
-            context=dynamic_context
-        )
+            context=dynamic_context)
+        
+        
         self.tracking_state.mapping = search_context
         self.tracking_state.prev_size = search_bbox[2:]
         

@@ -14,9 +14,9 @@ from torch.utils.data import Dataset
 from torch.utils.data.dataloader import default_collate
 
 from core.utils.gaussian_map import gaussian_label_function
-from core.train.preprocessing import BBoxCropWithOffsets, get_normalize_fn, TRACKING_AUGMENTATIONS, PHOTOMETRIC_AUGMENTATIONS
+from core.train.preprocessing import get_normalize_fn, TRACKING_AUGMENTATIONS, PHOTOMETRIC_AUGMENTATIONS
 from core.utils.box_coder import AEVTBoxCoder
-from core.utils.utils import handle_empty_bbox, read_img, ensure_bbox_boundaries, convert_center_to_bbox, get_extended_crop, get_regression_weight_label, extend_bbox, convert_xywh_to_xyxy
+from core.utils.utils import handle_empty_bbox, read_img, ensure_bbox_boundaries, get_extended_image_crop, get_scaled_crop_bbox, get_regression_weight_label, extend_bbox, convert_xywh_to_xyxy, goturn_shift
 import core.constants as constants
 
 
@@ -106,15 +106,27 @@ class TrackingDataset(ABC):
         template_item, search_item, dynamic_item, prev_dynamic_item = item_anno["template"], item_anno["search"], item_anno["dynamic"], item_anno["prev_dynamic"]
         
         template_image = read_img(template_item["img_path"])
-        search_image = read_img(search_item["img_path"])
-        dynamic_image = read_img(dynamic_item["img_path"])
-        prev_dynamic_image = read_img(prev_dynamic_item["img_path"])
+        
+        if search_item["img_path"] == template_item["img_path"]:
+            search_image = template_image.copy() 
+        else:
+            search_image = read_img(search_item["img_path"]) 
+        
+        if dynamic_item["img_path"] == template_item["img_path"]:
+            dynamic_image = template_image.copy()
+        elif dynamic_item["img_path"] == search_item["img_path"]:
+            dynamic_image = search_image.copy()
+        else:     
+            dynamic_image = read_img(dynamic_item["img_path"])       
+        
 
         template_bbox = ensure_bbox_boundaries(eval(template_item["bbox"]), img_shape=template_image.shape[:2])
         search_bbox = ensure_bbox_boundaries(eval(search_item["bbox"]), img_shape=search_image.shape[:2])
         
         dynamic_bbox = ensure_bbox_boundaries(eval(dynamic_item["bbox"]), img_shape=dynamic_image.shape[:2])
-        prev_dynamic_bbox = ensure_bbox_boundaries(eval(prev_dynamic_item["bbox"]), img_shape=prev_dynamic_image.shape[:2])
+        
+        prev_dynamic_image_shape = eval(prev_dynamic_item['frame_shape'])
+        prev_dynamic_bbox = ensure_bbox_boundaries(eval(prev_dynamic_item["bbox"]), img_shape=[prev_dynamic_image_shape[1], prev_dynamic_image_shape[0]])
         
         
         return dict(
@@ -125,7 +137,6 @@ class TrackingDataset(ABC):
             search_presence=search_item["presence"],
             dynamic_image=dynamic_image,
             dynamic_bbox=dynamic_bbox,
-            prev_dynamic_image=prev_dynamic_image,
             prev_dynamic_bbox=prev_dynamic_bbox
         )
 
@@ -154,7 +165,7 @@ class TrackingDataset(ABC):
     def _transform(self, item_data: Any) -> Any:
         search_presence = item_data["search_presence"]
         
-        template_crop, template_bbox, search_crop, search_bbox, dynamic_crop, dynamic_bbox, prev_dynamic_crop,  prev_dynamic_bbox = self._get_crops(item_data)
+        template_crop, template_bbox, search_crop, search_bbox, dynamic_crop, dynamic_bbox, prev_dynamic_bbox = self._get_crops(item_data)
         
         
         template_crop, search_crop, dynamic_crop = self._add_color_augs(dynamic_image=dynamic_crop, search_image=search_crop, template_image=template_crop)
@@ -207,50 +218,49 @@ class TrackingDataset(ABC):
     
 
 
-    def get_search_transform(self, image: np.array, bbox: np.array, context: np.array = None) -> Tuple[np.array, np.array]:
+    def get_bbox_from_context(self, bbox: np.array, context: np.array = None) -> np.array:
         search_size = self.sizes_config["search_image_size"]
-        crop, bbox, context = get_extended_crop(
-            image=image,
+        
+        bbox, context = get_scaled_crop_bbox(
             bbox=bbox,
             crop_size=search_size,
-            context=context
-        )
+            context=context)
         
-        
-        bbox_crop = convert_center_to_bbox(
-            [
-                crop.shape[0] // 2,
-                crop.shape[1] // 2,
-                search_size,
-                search_size,
-            ],
-        )
-        crop_aug = BBoxCropWithOffsets(
-            bbox_crop=bbox_crop,
-            scale=self.sizes_config["search_image_scale"],
-            shift=self.sizes_config["search_image_shift"],
-            crop_size=search_size,
-            p=0.5
-        )
-        result = crop_aug(image=crop, bboxes=[bbox])
-        crop, bbox = result["image"], result["bboxes"][0]
         bbox = handle_empty_bbox(
             ensure_bbox_boundaries(
                 np.array(bbox),
                 img_shape=(search_size, search_size),
             )
         )
-        return crop, bbox
+
+        
+        return bbox
+    
+    def get_search_transform(self, image: np.array, bbox: np.array, context: np.array = None) -> Tuple[np.array, np.array]:
+        search_size = self.sizes_config["search_image_size"]
+
+        crop, context = get_extended_image_crop(
+            image=image,
+            crop_size=search_size,
+            context=context
+        )
+        return crop, self.get_bbox_from_context(bbox,context)
 
     def get_template_transform(self, image: np.array, bbox: np.array) -> Tuple[np.array, np.array]:
         template_size = self.sizes_config["template_image_size"]
         context = extend_bbox(bbox, offset=self.sizes_config["template_bbox_offset"], image_width=image.shape[1], image_height=image.shape[0])
-        crop, bbox, _ = get_extended_crop(
+        crop, context = get_extended_image_crop(
             image=image,
+            crop_size=template_size,
+            context=context
+        )
+        
+        bbox, context = get_scaled_crop_bbox(
             bbox=bbox,
             crop_size=template_size,
             context=context
         )
+        
         bbox = handle_empty_bbox(
             ensure_bbox_boundaries(
                 np.array(bbox),
@@ -293,23 +303,29 @@ class TrackingDataset(ABC):
         template_crop, template_bbox = self.get_template_transform(
             item_data["template_image"], item_data["template_bbox"], 
         )
-        
+        i = 1
         context_factor = 2.0
         while True:
             offset=(random.random() * 0.5) + context_factor
-            dynamic_context = extend_bbox(item_data["dynamic_bbox"], image_width=item_data["dynamic_image"].shape[1], image_height=item_data["dynamic_image"].shape[0], offset=offset)
+            dynamic_bbox_aug = goturn_shift(bbox=item_data["dynamic_bbox"], image_width=item_data["dynamic_image"].shape[1], image_height=item_data["dynamic_image"].shape[0], kContextFactor=offset)
+            dynamic_context = extend_bbox(dynamic_bbox_aug, image_width=item_data["dynamic_image"].shape[1], image_height=item_data["dynamic_image"].shape[0], offset=offset)
             
             if self.check_validity( convert_xywh_to_xyxy(dynamic_context), convert_xywh_to_xyxy(item_data["search_bbox"])) and \
                 self.check_validity( convert_xywh_to_xyxy(dynamic_context), convert_xywh_to_xyxy(item_data["prev_dynamic_bbox"])): 
                     break
             else:
                 # print(f"Object not within the search region, increasing the region by {100*context_factor}%")
-                context_factor += 2.0
+                context_factor *= 2.0
+            i+=1
+            if i > 10:
+                print("too much context_factor")
+                break
+        
                 
         dynamic_crop, dynamic_bbox = self.get_search_transform(item_data["dynamic_image"], item_data["dynamic_bbox"], context=dynamic_context)
         search_crop, search_bbox = self.get_search_transform(item_data["search_image"], item_data["search_bbox"], context=dynamic_context)
-        prev_dynamic_crop,  prev_dynamic_bbox = self.get_search_transform(item_data["prev_dynamic_image"], item_data["prev_dynamic_bbox"], context=dynamic_context)
-        return template_crop, template_bbox, search_crop, search_bbox, dynamic_crop, dynamic_bbox, prev_dynamic_crop,  prev_dynamic_bbox
+        prev_dynamic_bbox =  self.get_bbox_from_context(item_data["prev_dynamic_bbox"], context=dynamic_context)
+        return template_crop, template_bbox, search_crop, search_bbox, dynamic_crop, dynamic_bbox,prev_dynamic_bbox
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> "TrackingDataset":

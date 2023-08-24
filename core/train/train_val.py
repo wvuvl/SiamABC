@@ -5,19 +5,18 @@ import time
 import numpy as np
 import torch
 from hydra.utils import instantiate
-from torch import Tensor, inference_mode, load, save
+from torch import Tensor, inference_mode, save
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, DistributedSampler
 from torch.utils.data.dataloader import default_collate
 from torchmetrics import MetricCollection
 from torchvision.ops import box_convert
 from statistics import mean
-import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.backends.cudnn as cudnn
 
 from core.metrics import DatasetAwareMetric, BoxIoUMetric, TrackingFailureRateMetric, box_iou_metric
 from core.models.loss import AEVTLoss
-from core.utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
+from core.utils.box_coder import TrackerDecodeResult
 from core.utils.utils import read_img, get_iou, plot_loss
 from core.utils.logger import create_logger
 import core.constants as constants

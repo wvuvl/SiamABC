@@ -17,7 +17,7 @@ from core.utils.hydra import load_hydra_config_from_path
 def get_tracker(config_path: str, config_name: str, weights_path: str) -> AEVTTracker:
     config = load_hydra_config_from_path(config_path=config_path, config_name=config_name)
     model = instantiate(config["model"])
-    model = load_from_lighting(model, weights_path).cuda().eval()
+    model = load_from_lighting(model, weights_path, map_location=0).cuda().eval()
     tracker: AEVTTracker = instantiate(config["tracker"], model=model)
     return tracker
 
@@ -26,10 +26,10 @@ def track(tracker: AEVTTracker, frames: List[np.ndarray], initial_bbox: np.ndarr
     tracked_bboxes = [initial_bbox]
     tracker.initialize(frames[0], initial_bbox)
     
-    bbox = tracked_bboxes[0]
-    bbox = [bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]]
-    img = frames[0].copy()
-    frame_w_rec = cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 0), 2)
+    # bbox = tracked_bboxes[0]
+    # bbox = [bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]]
+    # img = frames[0].copy()
+    # frame_w_rec = cv2.rectangle(img, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 0), 2)
     
     dynamic_frame = frames[0]
     prev_dynamic_frame = frames[0]
@@ -42,9 +42,9 @@ def track(tracker: AEVTTracker, frames: List[np.ndarray], initial_bbox: np.ndarr
             prev_dynamic_frame=dynamic_frame
             dynamic_frame=frame
 
-        bbox = tracked_bboxes[idx+1]
-        bbox = [bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]]
-        frame_w_rec = cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 0), 2)
+        # bbox = tracked_bboxes[idx+1]
+        # bbox = [bbox[0], bbox[1], bbox[0]+bbox[2], bbox[1]+bbox[3]]
+        # frame_w_rec = cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])), (255, 255, 0), 2)
         # print()
     return tracked_bboxes
 
@@ -63,12 +63,12 @@ def visualize(frames: List[np.ndarray], tracked_bboxes: List[np.ndarray]):
 
 import os
 def main(
-    initial_bbox: List[int] = [489, 188, 497, 140],
+    initial_bbox: List[int] = [489, 188, 497, 140], #[163, 53, 45, 174],# 
     video_path: str = "assets/airplane_in_rain.mp4",
     output_path: str = "outputs/airplane_in_rain.mp4",
     config_path: str = "core/config",
     config_name: str = "AEVT_tracker",
-    weights_path: str = "/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/experiments/2023-08-22-12-26-28_Tracking_AEVT/AEVT/trained_model_ckpt_7.pt",
+    weights_path: str = "/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/models/small/trained_model_ckpt_2.pt",
 ):
     tracker = get_tracker(config_path=config_path, config_name=config_name, weights_path=weights_path)
     video, metadata = iio.imread(video_path), iio.immeta(video_path, exclude_applied=False)

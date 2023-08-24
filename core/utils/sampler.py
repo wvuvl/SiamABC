@@ -33,10 +33,12 @@ class TrackSampler(ABC):
     
     def drop_bad_bboxes(self, data):
         bboxes = data["bbox"]
+        frame_shape = data["frame_shape"]
         indexes = []
-        for idx, bbox in enumerate(bboxes):
+        for idx, (bbox, i_frame_shape) in tqdm(enumerate(zip(bboxes, frame_shape)), desc="filtering data - "):
             x,y,w,h = eval(bbox)
-            if (x+w) <= x+15 or (y+h) <= y+15 or w==0 or h==0:
+            im_w,im_h = eval(i_frame_shape)
+            if w <= 15 or h <= 15 or x >= im_w-15 or y >= im_h-15 or x<0 or y<0:
                 indexes.append(idx)
         data = data.drop(indexes)
         data = data.reset_index(drop=True)

@@ -3,6 +3,7 @@ import random
 import torch
 import cv2
 import os
+import math
 import numpy as np
 import albumentations as A
 import matplotlib.pyplot as plt
@@ -11,6 +12,121 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 BBox = Union[List, np.array]
 
+def sample_rand_uniform():
+    RAND_MAX = 2147483647
+    return (random.randint(0, RAND_MAX) + 1) * 1.0 / (RAND_MAX + 2)
+
+
+def sample_exp_two_sides(lambda_):
+    RAND_MAX = 2147483647
+    pos_or_neg = random.randint(0, RAND_MAX)
+    if (pos_or_neg % 2) == 0:
+        pos_or_neg = 1
+    else:
+        pos_or_neg = -1
+
+    rand_uniform = sample_rand_uniform()
+    return math.log(rand_uniform) / (lambda_ * pos_or_neg)
+
+def goturn_shift(bbox, image_height, image_width, shift_motion_model=True,_lamda_shift=5, _lamda_scale=15, _min_scale=(-0.4), _max_scale=0.4, kContextFactor=2):
+    """
+    bbox: x1, y1, w, h
+    motion model based shift
+    
+    returns: x1, y1, w, h
+    """
+    
+    bbox = convert_xywh_to_xyxy(bbox)
+    
+    center_x = (bbox[0]+bbox[2]) / 2
+    center_y = (bbox[1]+bbox[3]) / 2
+
+    width = bbox[2]-bbox[0]
+    height = bbox[3]-bbox[1]
+
+    kMaxNumTries = 10
+
+    new_width = -1
+    num_tries_width = 0
+    while ((new_width < 0) or (new_width > image_width - 1)) and (num_tries_width < kMaxNumTries):
+        if shift_motion_model:
+            width_scale_factor = max(_min_scale, min(_max_scale, sample_exp_two_sides(_lamda_scale)))
+        else:
+            rand_num = sample_rand_uniform()
+            width_scale_factor = rand_num * (_max_scale - _min_scale) + _min_scale
+
+        new_width = width * (1 + width_scale_factor)
+        new_width = max(1.0, min((image_width - 1), new_width))
+        num_tries_width = num_tries_width + 1
+
+    new_height = -1
+    num_tries_height = 0
+    while ((new_height < 0) or (new_height > image_height - 1)) and (num_tries_height < kMaxNumTries):
+        if shift_motion_model:
+            height_scale_factor = max(_min_scale, min(_max_scale, sample_exp_two_sides(_lamda_scale)))
+        else:
+            rand_num = sample_rand_uniform()
+            height_scale_factor = rand_num * (_max_scale - _min_scale) + _min_scale
+
+        new_height = height * (1 + height_scale_factor)
+        new_height = max(1.0, min((image_height - 1), new_height))
+        num_tries_height = num_tries_height + 1
+
+    first_time_x = True
+    new_center_x = -1
+    num_tries_x = 0
+
+    while ((first_time_x or (new_center_x < center_x - width * kContextFactor / 2)
+            or (new_center_x > center_x + width * kContextFactor / 2)
+            or ((new_center_x - new_width / 2) < 0)
+            or ((new_center_x + new_width / 2) > image_width))
+            and (num_tries_x < kMaxNumTries)):
+
+        if shift_motion_model:
+            new_x_temp = center_x + width * sample_exp_two_sides(_lamda_shift)
+        else:
+            rand_num = sample_rand_uniform()
+            new_x_temp = center_x + rand_num * (2 * new_width) - new_width
+
+        new_center_x = min(image_width - new_width / 2, max(new_width / 2, new_x_temp))
+        first_time_x = False
+        num_tries_x = num_tries_x + 1
+
+    first_time_y = True
+    new_center_y = -1
+    num_tries_y = 0
+
+    while ((first_time_y or (new_center_y < center_y - height * kContextFactor / 2)
+            or (new_center_y > center_y + height * kContextFactor / 2)
+            or ((new_center_y - new_height / 2) < 0)
+            or ((new_center_y + new_height / 2) > image_height))
+            and (num_tries_y < kMaxNumTries)):
+
+        if shift_motion_model:
+            new_y_temp = center_y + height * sample_exp_two_sides(_lamda_shift)
+        else:
+            rand_num = sample_rand_uniform()
+            new_y_temp = center_y + rand_num * (2 * new_height) - new_height
+
+        new_center_y = min(image_height - new_height / 2, max(new_height / 2, new_y_temp))
+        first_time_y = False
+        num_tries_y = num_tries_y + 1
+
+    x1 = new_center_x - new_width / 2
+    x2 = new_center_x + new_width / 2
+    y1 = new_center_y - new_height / 2
+    y2 = new_center_y + new_height / 2
+
+    return np.array([x1, y1, x2-x1, y2-y1]).astype('int32')
+
+
+#####
+#####
+#####
+# FEAR code
+####
+####
+####
 
 def to_device(x: Union[torch.Tensor, torch.nn.Module], cuda_id: int = 0) -> torch.Tensor:
     return x.cuda(cuda_id) if torch.cuda.is_available() else x
@@ -254,8 +370,10 @@ def clamp_bbox(bbox: np.array, shape: Tuple[int, int], min_side: int = 3) -> np.
 ####
 ####
 ####
-def get_extended_crop(
-    image: np.array, bbox: np.array, crop_size: int, context: np.array, padding_value: np.array = None) -> Tuple[np.array, np.array, np.array]:
+
+
+def get_extended_image_crop(
+    image: np.array, crop_size: int, context: np.array, padding_value: np.array = None) -> Tuple[np.array, np.array]:
     """
     
     
@@ -274,8 +392,6 @@ def get_extended_crop(
     """
     if padding_value is None:
         padding_value = np.mean(image, axis=(0, 1))
-    bbox_params = {"format": "coco", "min_visibility": 0, "label_fields": ["category_id"], "min_area": 0}
-    resize_aug = A.Compose([A.Resize(crop_size, crop_size)], bbox_params=bbox_params)
     
     pad_left, pad_top = max(-context[0], 0), max(-context[1], 0)
     pad_right, pad_bottom = max(context[0] + context[2] - image.shape[1], 0), max(
@@ -289,15 +405,31 @@ def get_extended_crop(
     padded_crop = cv2.copyMakeBorder(
         crop, pad_top, pad_bottom, pad_left, pad_right, cv2.BORDER_CONSTANT, value=padding_value
     )
-    padded_bbox = np.array([bbox[0] - context[0], bbox[1] - context[1], bbox[2], bbox[3]])
     
-    if padded_crop is None:
-        print("None")    
-    padded_bbox = ensure_bbox_boundaries(padded_bbox, img_shape=padded_crop.shape[:2])
-    result = resize_aug(image=padded_crop, bboxes=[padded_bbox], category_id=["bbox"])
-    image, bbox = result["image"], np.array(result["bboxes"][0])
-    return image, bbox, context
+    image = cv2.resize(padded_crop, (crop_size, crop_size), interpolation=cv2.INTER_LINEAR)
+    
+    return image, context
 
+def get_scaled_crop_bbox(
+    bbox: np.array, crop_size: int, context: np.array) -> np.array:
+    
+    padded_bbox = np.array([bbox[0] - context[0], bbox[1] - context[1], bbox[2], bbox[3]])
+  
+    padded_bbox = ensure_bbox_boundaries(padded_bbox, img_shape=[context[3], context[2]])
+
+    bbox = np.array(scale_bbox(bbox=padded_bbox, padded_crop_w=context[2], padded_crop_h=context[3], crop_size=crop_size))
+    
+    return bbox, context
+
+def scale_bbox(bbox, padded_crop_w, padded_crop_h, crop_size):
+    ''' 
+    bbox: x,y,w,h
+    search_region
+    '''
+    scale_w = crop_size/padded_crop_w
+    scale_h = crop_size/padded_crop_h
+    
+    return [bbox[0]*scale_w, bbox[1]*scale_h, bbox[2]*scale_w, bbox[3]*scale_h]
 
 def rescale_crop(image: np.array, bbox: np.array, out_size: int, padding: Any = (0, 0, 0)) -> Tuple[np.array, np.array]:
     """
