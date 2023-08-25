@@ -16,7 +16,7 @@ from torch.utils.data.dataloader import default_collate
 from core.utils.gaussian_map import gaussian_label_function
 from core.train.preprocessing import get_normalize_fn, TRACKING_AUGMENTATIONS, PHOTOMETRIC_AUGMENTATIONS
 from core.utils.box_coder import AEVTBoxCoder
-from core.utils.utils import handle_empty_bbox, read_img, ensure_bbox_boundaries, get_extended_image_crop, get_scaled_crop_bbox, get_regression_weight_label, extend_bbox, convert_xywh_to_xyxy, goturn_shift
+from core.utils.utils import handle_empty_bbox, read_img, ensure_bbox_boundaries, get_extended_image_crop, get_scaled_crop_bbox, get_regression_weight_label, extend_bbox, convert_xywh_to_xyxy, augment_bbox
 import core.constants as constants
 
 
@@ -137,7 +137,8 @@ class TrackingDataset(ABC):
             search_presence=search_item["presence"],
             dynamic_image=dynamic_image,
             dynamic_bbox=dynamic_bbox,
-            prev_dynamic_bbox=prev_dynamic_bbox
+            prev_dynamic_bbox=prev_dynamic_bbox,
+            prev_dynamic_image_shape=prev_dynamic_image_shape
         )
 
     def _form_anno_dict(self, item_data: Any) -> Any:
@@ -302,29 +303,28 @@ class TrackingDataset(ABC):
     def _get_crops(self, item_data):
         template_crop, template_bbox = self.get_template_transform(
             item_data["template_image"], item_data["template_bbox"], 
-        )
-        i = 1
-        context_factor = 2.0
-        while True:
-            offset=(random.random() * 0.5) + context_factor
-            dynamic_bbox_aug = goturn_shift(bbox=item_data["dynamic_bbox"], image_width=item_data["dynamic_image"].shape[1], image_height=item_data["dynamic_image"].shape[0], kContextFactor=offset)
-            dynamic_context = extend_bbox(dynamic_bbox_aug, image_width=item_data["dynamic_image"].shape[1], image_height=item_data["dynamic_image"].shape[0], offset=offset)
-            
-            if self.check_validity( convert_xywh_to_xyxy(dynamic_context), convert_xywh_to_xyxy(item_data["search_bbox"])) and \
-                self.check_validity( convert_xywh_to_xyxy(dynamic_context), convert_xywh_to_xyxy(item_data["prev_dynamic_bbox"])): 
-                    break
-            else:
-                # print(f"Object not within the search region, increasing the region by {100*context_factor}%")
-                context_factor *= 2.0
-            i+=1
-            if i > 10:
-                print("too much context_factor")
-                break
+        )       
         
-                
+        context_factor = 2.0
+        offset= random.random() + random.randint(1,3)*context_factor
+        
+        # augmenting dynamic_bbox,
+        dynamic_bbox_aug = augment_bbox(bbox=item_data["dynamic_bbox"], image_width=item_data["dynamic_image"].shape[1], image_height=item_data["dynamic_image"].shape[0], scale=self.sizes_config["search_image_scale"], shift=self.sizes_config["search_image_shift"], offset=offset)
+        dynamic_context = extend_bbox(dynamic_bbox_aug, image_width=item_data["dynamic_image"].shape[1], image_height=item_data["dynamic_image"].shape[0], offset=offset)        
         dynamic_crop, dynamic_bbox = self.get_search_transform(item_data["dynamic_image"], item_data["dynamic_bbox"], context=dynamic_context)
-        search_crop, search_bbox = self.get_search_transform(item_data["search_image"], item_data["search_bbox"], context=dynamic_context)
-        prev_dynamic_bbox =  self.get_bbox_from_context(item_data["prev_dynamic_bbox"], context=dynamic_context)
+        
+        
+        # augmenting search bbox
+        search_bbox_aug = augment_bbox(bbox=item_data["search_bbox"], image_width=item_data["search_image"].shape[1], image_height=item_data["search_image"].shape[0], scale=self.sizes_config["search_image_scale"], shift=self.sizes_config["search_image_shift"], offset=offset)
+        search_context = extend_bbox(search_bbox_aug, image_width=item_data["search_image"].shape[1], image_height=item_data["search_image"].shape[0], offset=offset)
+        search_crop, search_bbox = self.get_search_transform(item_data["search_image"], item_data["search_bbox"], context=search_context)
+        
+        
+        # augmenting prev_dynamic_bbox 
+        prev_dynamic_bbox_aug = augment_bbox(bbox=item_data["prev_dynamic_bbox"], image_width=item_data["prev_dynamic_image_shape"][0], image_height=item_data["prev_dynamic_image_shape"][1], scale=self.sizes_config["search_image_scale"], shift=self.sizes_config["search_image_shift"], offset=offset)
+        prev_dynamic_context = extend_bbox(prev_dynamic_bbox_aug, image_width=item_data["prev_dynamic_image_shape"][0], image_height=item_data["prev_dynamic_image_shape"][1], offset=offset)
+        prev_dynamic_bbox =  self.get_bbox_from_context(item_data["prev_dynamic_bbox"], context=prev_dynamic_context)
+        
         return template_crop, template_bbox, search_crop, search_bbox, dynamic_crop, dynamic_bbox,prev_dynamic_bbox
 
     @classmethod
