@@ -59,14 +59,6 @@ def augment_bbox(bbox, image_height, image_width, scale, shift, offset):
         new_w = min(image_width, new_x + w + scale_x * w, x_max) - new_x
         new_h = min(image_height, new_y + h + scale_y * h, y_max) - new_y
         
-        if new_x < 0:
-            new_x, new_w = 0, new_w + new_x
-        if new_y < 0:
-            new_y, new_h = 0, new_y + new_h
-            
-        new_w = min(image_width, new_x + new_w) - new_x
-        new_h = min(image_height, new_y + new_h) - new_y
-        
         return  [int(new_x), int(new_y), int(new_w), int(new_h)]
     
 def goturn_shift(bbox, image_height, image_width, shift_motion_model=True,_lamda_shift=10, kContextFactor=2):
@@ -728,6 +720,7 @@ def plot_loss(train_losses, results_dir, val_ious=None):
     plt.savefig(os.path.join(results_dir, 'Training Losses'))
     
     if val_ious is not None:
+        plt.figure()
         x_range = np.arange(1, len(val_ious)+1)
         plt.plot(x_range, val_ious)
         plt.title('Validation IoUs')

@@ -91,9 +91,11 @@ class AEVTLoss(nn.Module):
             pred=outputs[constants.TARGET_CLASSIFICATION_KEY], label=gt[constants.TARGET_CLASSIFICATION_KEY]
         )
         
+        
+        # symmetricizing
         p1_search, p2_search, z1_search, z2_search = outputs[constants.SIMSIAM_SEARCH_OUT_KEY]
         cos_sim_loss_search = 0.5 * (1 - (self.cos_sim_loss(p1_search, z2_search).mean() + self.cos_sim_loss(p2_search, z1_search).mean()) * 0.5)
-        
+        # symmetricizing
         p1_dynamic, p2_dynamic, z1_dynamic, z2_dynamic = outputs[constants.SIMSIAM_DYNAMIC_OUT_KEY]
         cos_sim_loss_dynamic = 0.5 * (1 - (self.cos_sim_loss(p1_dynamic, z2_dynamic).mean() + self.cos_sim_loss(p2_dynamic, z1_dynamic).mean()) * 0.5)
         
@@ -101,6 +103,6 @@ class AEVTLoss(nn.Module):
         return {
             constants.TARGET_CLASSIFICATION_KEY: classification_loss * self.coeffs[constants.TARGET_CLASSIFICATION_KEY],
             constants.TARGET_REGRESSION_LABEL_KEY: regression_loss * self.coeffs[constants.TARGET_REGRESSION_LABEL_KEY],
-            constants.SIMSIAM_SEARCH_OUT_KEY: 0.1 * cos_sim_loss_search,
-            constants.SIMSIAM_DYNAMIC_OUT_KEY: 0.1 * cos_sim_loss_dynamic
+            constants.SIMSIAM_SEARCH_OUT_KEY: cos_sim_loss_search * self.coeffs[constants.SIMILARITY_KEY],
+            constants.SIMSIAM_DYNAMIC_OUT_KEY: cos_sim_loss_dynamic * self.coeffs[constants.SIMILARITY_KEY]
         }

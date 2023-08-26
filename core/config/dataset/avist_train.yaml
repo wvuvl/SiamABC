@@ -15,6 +15,7 @@ sizes:
 
 frame_offset: 20
 negative_ratio: 0
+
 # clip_range: True
 
 dynamic_frame_offset:
@@ -33,7 +34,7 @@ train:
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         # clip_range: ${clip_range}
-        num_samples: 78000 # 100000
+        num_samples: 1000 # 100000
       transform: photometric
       regression_weight_label_size: ${tracker.score_size}
       sizes: ${sizes}
@@ -42,15 +43,15 @@ train:
 val:
   img_size: 256
   ann_path:
-  # datasets:
+  datasets:
   #   - name: vot
   #     root_dir: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/vot2018
   #     version: 2019
   #   - name: got10k
   #     root_dir: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/got10k
   #     subset: val
-  #   - name: nfs
-  #     root_dir: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/SOTA_datasets/NFS/NFS
+    - name: nfs
+      root_dir: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/SOTA_datasets/NFS/NFS
 
 # test:
 #   img_size: 256

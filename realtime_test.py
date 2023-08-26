@@ -75,7 +75,7 @@ class Tracker:
         frames_path: str,
         config_path: str = "core/config",
         config_name: str = "AEVT_tracker",
-        weights_path: str = "/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/models/small/trained_model_ckpt_2.pt",
+        weights_path: str = "/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/models/small/trained_model_ckpt_20.pt",
         ):
         """load model """
         loader = loadfromfolder(frames_path)
@@ -154,6 +154,6 @@ class Tracker:
 
 
 if __name__ == "__main__":
-    frames_path = '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/got10k/OTB/BlurOwl/img'
-    AEVT_tracker = Tracker(frames_path)
+    frames_path = '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/avist/sequences/archival_video_man'
+    AEVT_tracker = Tracker(frames_path, weights_path='/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/experiments/2023-08-25-18-32-28_Tracking_AEVT/AEVT/trained_model_ckpt_27.pt')
     AEVT_tracker.track()

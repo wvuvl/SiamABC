@@ -60,7 +60,7 @@ def main(
     output_path: str = "outputs/test.mp4",
     config_path: str = "core/config",
     config_name: str = "AEVT_tracker",
-    weights_path: str = "/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/models/small/trained_model_ckpt_5.pt",
+    weights_path: str = "/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/models/small/trained_model_ckpt_20.pt",
 ):
     tracker = get_tracker(config_path=config_path, config_name=config_name, weights_path=weights_path)
     video, metadata = iio.imread(video_path), iio.immeta(video_path, exclude_applied=False)

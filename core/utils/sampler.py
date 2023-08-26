@@ -94,22 +94,23 @@ class TrackSampler(ABC):
         # negatives allowed
         search_item = (search_items.sample(1).iloc[0]) #(search_items[(search_items["presence"] == 1)].sample(1).iloc[0])
 
-        
-        dynamic_item = (
-            search_items[
-                (search_items["frame_index"] > search_item["frame_index"] - 15) #- self.frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
-                & (search_items["frame_index"] <= search_item["frame_index"])
+        dynamic_items = (
+            search_items[(search_items["frame_index"] <= search_item["frame_index"])
                 & (search_items["presence"] == 1) 
+            ]
+        )
+        dynamic_item = (
+            dynamic_items[
+                (dynamic_items["frame_index"] > dynamic_items["frame_index"].iloc[-1] - 15) #- self.frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
             ]
             .sample(1)
             .iloc[0]
         )
         
         prev_dynamic_item = (
-            search_items[
-                (search_items["frame_index"] > dynamic_item["frame_index"] - 15) #- self.frame_offset/4)
-                & (search_items["frame_index"] <= dynamic_item["frame_index"] )
-                & (search_items["presence"] == 1) 
+            dynamic_items[
+                (dynamic_items["frame_index"] > dynamic_item["frame_index"] - 15) #- self.frame_offset/4)
+                & (dynamic_items["frame_index"] <= dynamic_item["frame_index"] )
             ]
             .sample(1)
             .iloc[0]

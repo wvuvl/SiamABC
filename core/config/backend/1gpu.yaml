@@ -1,5 +1,5 @@
 # @package _global_
-num_workers: 8
+num_workers: 4
 ddp: True
 gpus: [ 0 ]
 precision: 32

@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from hydra.utils import instantiate
 from torch import Tensor, inference_mode, save
-from torch.utils.data import ConcatDataset, DataLoader, Dataset, DistributedSampler
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, DistributedSampler, Subset
 from torch.utils.data.dataloader import default_collate
 from torchmetrics import MetricCollection
 from torchvision.ops import box_convert
@@ -91,7 +91,7 @@ class AEVT_train_val:
         self.tensorboard_logger = None
         
         
-        self.tracker = instantiate(config["tracker"], model=self.model, cuda_id=self.device_id)
+        self.tracker = instantiate(config["tracker"], model=self.model.module, cuda_id=self.device_id)
         self.box_coder = self.tracker.box_coder
         self.metrics = MetricCollection(
             {
@@ -102,11 +102,8 @@ class AEVT_train_val:
         self.dataset_aware_metric = DatasetAwareMetric(metric_name="box_iou", metric_fn=box_iou_metric)
         self.criterion = AEVTLoss(coeffs=config["loss"]["coeffs"]).to(self.device_id)
         
-        
         self.train_dl, self.train_sampler = self._get_dataloader(self.train_dataset, "train")
-        self.val_dl, self.val_sampler = self._get_dataloader(self.val_dataset, "val") if self.val_dataset is not None else None,None
-        
-        
+                
         self.configure_optimizers()
         self.start_epoch = 0
         self.max_epochs = self.config["max_epochs"]
@@ -136,6 +133,14 @@ class AEVT_train_val:
         Returns:
 
         """
+        
+        
+        if loader_name == "val":
+            indices = np.arange(dataset.__len__())
+            val_size = int(0.1*dataset.__len__())
+            rand_sampling = list(np.random.choice(indices, val_size))
+            dataset = Subset(dataset,rand_sampling)
+        
         collate_fn = get_collate_for_dataset(dataset)
 
         drop_last = loader_name == "train"
@@ -146,22 +151,26 @@ class AEVT_train_val:
         batch_size = self._get_batch_size(loader_name)
         # Number of workers must not exceed batch size
         num_workers = min(batch_size, self.config["num_workers"])
+           
         loader = DataLoader(
-            dataset=dataset,
-            batch_size=batch_size,
-            shuffle=should_shuffle,
-            sampler=sampler,
-            num_workers=num_workers,
-            pin_memory=True,
-            drop_last=drop_last,
-            collate_fn=collate_fn,
-        )
+                dataset=dataset,
+                batch_size=batch_size,
+                shuffle=should_shuffle,
+                sampler=sampler,
+                num_workers=num_workers,
+                pin_memory=True,
+                drop_last=drop_last,
+                collate_fn=collate_fn,
+            )
+        
+            
+            
         return loader, sampler
     
     def configure_optimizers(self) -> Tuple[List[torch.optim.Optimizer], List[Dict[str, Any]]]:
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config.get('lr', 0.0001))
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
-                                                        mode=self.config.get("metric_mode", "min"),
+                                                        mode="max",
                                                         factor=0.5,
                                                         patience=5,
                                                         min_lr=1e-6)
@@ -179,21 +188,24 @@ class AEVT_train_val:
                 
             # logger.info(self.scheduler.get_lr())
             
-            train_epoch_loss = self.train_epoch(e, self.train_dl)
-            self.scheduler.step(train_epoch_loss)
+            train_epoch_loss, class_loss, regression_loss, search_sim_loss, dynamic_sim_loss = self.train_epoch(e, self.train_dl)
             train_losses.append(train_epoch_loss)
             
-            if self.val_dl is not None:
-                if self.use_ddp: self.val_sampler.set_epoch(e)
-                val_iou = self.validate_network(self.val_dl)
+            if self.val_dataset is not None:
+                val_dl, val_sampler = self._get_dataloader(self.val_dataset, "val")
+                if self.use_ddp: val_sampler.set_epoch(e)
+                val_iou = self.validate_network(val_dl)
                 val_ious.append(val_iou)
-                logger.info('Train loss: {:.3f}; Validation Iou: {:.3f} \n'.format(train_epoch_loss, val_iou))
+                logger.info('Total Train loss: {:.3f}; Validation Iou: {:.3f} \n'.format(train_epoch_loss, val_iou))
+                self.scheduler.step(val_iou)
             else:
                 logger.info('Train loss: {:.3f} \n'.format(train_epoch_loss))
-
+            
+            logger.info('Specific Train losses - \nClass Loss: {:.3f}; \nRegression Loss: {:.3f} \nSearch Sim Loss: {:.3f} \nDynamic Sim Loss: {:.3f} \n'\
+                    .format(class_loss, regression_loss, search_sim_loss, dynamic_sim_loss))
             # if (e%10)==0 or e==self.max_epochs: 
             self.save_network_checkpoint(e)
-            plot_loss(train_losses, self.save_path)
+            plot_loss(train_losses, self.save_path, val_ious if len(val_ious)>0 else None)
             
         logger.info('Train time: {} \n'.format(time.strftime("%H:%M:%S", time.gmtime(time.time() - start_train))))
         return train_losses, val_ious
@@ -202,6 +214,12 @@ class AEVT_train_val:
     def train_epoch(self, e, train_dl):
         self.model.train()
         train_epoch_losses = []
+        
+        train_classification_loss = []
+        train_regression_loss = []
+        search_similarity_loss = []
+        dynamic_similarity_loss = []
+        
         progress_bar = tqdm(train_dl)
         for batch in progress_bar:
             inputs, targets = self.get_input(batch)
@@ -209,20 +227,19 @@ class AEVT_train_val:
             outputs = self.model(inputs)
             loss = self.criterion(outputs, targets)
             total_loss, loss_dict = self.compute_loss(loss)
+            
             train_epoch_losses.append(total_loss.item())
+            
+            train_classification_loss.append(loss_dict[constants.TARGET_CLASSIFICATION_KEY].item())
+            train_regression_loss.append(loss_dict[constants.TARGET_REGRESSION_LABEL_KEY].item())
+            search_similarity_loss.append(loss_dict[constants.SIMSIAM_SEARCH_OUT_KEY].item())
+            dynamic_similarity_loss.append(loss_dict[constants.SIMSIAM_DYNAMIC_OUT_KEY].item())
+            
             total_loss.backward()
             self.optimizer.step() 
-            
             progress_bar.set_description(f'Training - Epoch {e}/{self.max_epochs} | loss {mean(train_epoch_losses):.3f}')
-            
-            decoded_info: TrackerDecodeResult = self.box_coder.decode(
-                    classification_map=outputs[constants.TARGET_CLASSIFICATION_KEY],
-                    regression_map=outputs[constants.TARGET_REGRESSION_LABEL_KEY],
-                    )
-            pred_boxes = box_convert(decoded_info.bbox, "xywh", "xyxy")
-            gt_boxes = box_convert(targets[constants.TRACKER_TARGET_BBOX_KEY], "xywh", "xyxy")
         
-        return mean(train_epoch_losses)
+        return mean(train_epoch_losses), mean(train_classification_loss), mean(train_regression_loss), mean(search_similarity_loss), mean(dynamic_similarity_loss)
     
     def validate_network(self, data_loader, threshold:int = 0.5):
         self.model.eval()
@@ -232,30 +249,30 @@ class AEVT_train_val:
         seq_ious = []
         
         with inference_mode(): # no_grad():
-            for batch in tqdm(data_loader, desc='Testing the dataset with the gt'):
-                for image_files, annotations, dataset_name in batch:
-                    image_t_0 = read_img(image_files[0])
-                    self.tracker.initialize(image_t_0, list(map(int, annotations[0])))
-                    num_samples = min(max_samples, len(annotations))
-                    ious = []
-                    failure_map = []
-                    dynamic_image = image_t_0
-                    prev_dynamic_image = image_t_0
-                    for i in trange(1, num_samples):
-                        search_image = read_img(image_files[i])
-                        bbox, cls_score = self.tracker.update(search=search_image, dynamic=dynamic_image, prev_dynamic=None)
-                        iou = get_iou(np.array(bbox), np.array(list(map(int, annotations[i]))))
-                        ious.append(iou)
-                        failure_map.append(int(iou < _iou_threshold))
-                        
-                        # TODO: check if this threholding is proper
-                        # updating dynamic templates
-                        if cls_score > threshold:
-                            prev_dynamic_image=dynamic_image
-                            dynamic_image=search_image
-                    mean_iou = np.mean(ious)
-                    seq_ious.append(mean_iou)
+            for image_files, annotations, dataset_name in tqdm(data_loader, desc='Validating the dataset with the gt'):
+                                
+                image_t_0 = read_img(image_files[0][0])
+                self.tracker.initialize(image_t_0, list(map(int, annotations[0][0])))
+                num_samples = min(max_samples, len(annotations[0]))
+                ious = []
+                failure_map = []
+                dynamic_image = image_t_0
+                prev_dynamic_image = image_t_0
+                for i in range(1, num_samples):
+                    search_image = read_img(image_files[i][0])
+                    bbox, cls_score = self.tracker.update(search=search_image, dynamic=dynamic_image, prev_dynamic=None)
+                    iou = get_iou(np.array(bbox), np.array(list(map(int, annotations[0][i]))))
+                    ious.append(iou)
+                    failure_map.append(int(iou < _iou_threshold))
                     
+                    # TODO: check if this threholding is proper
+                    # updating dynamic templates
+                    if cls_score > threshold:
+                        prev_dynamic_image=dynamic_image
+                        dynamic_image=search_image
+                mean_iou = np.mean(ious)
+                seq_ious.append(mean_iou)
+                
         return mean(seq_ious)
     
     def compute_loss(self, loss: Dict[str, Tensor]) -> Tuple[Tensor, Dict[str, Tensor]]:

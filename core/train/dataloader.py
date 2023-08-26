@@ -306,13 +306,30 @@ class TrackingDataset(ABC):
         )       
         
         context_factor = 2.0
-        offset= random.random() + random.randint(1,3)*context_factor
-        
-        # augmenting dynamic_bbox,
-        dynamic_bbox_aug = augment_bbox(bbox=item_data["dynamic_bbox"], image_width=item_data["dynamic_image"].shape[1], image_height=item_data["dynamic_image"].shape[0], scale=self.sizes_config["search_image_scale"], shift=self.sizes_config["search_image_shift"], offset=offset)
-        dynamic_context = extend_bbox(dynamic_bbox_aug, image_width=item_data["dynamic_image"].shape[1], image_height=item_data["dynamic_image"].shape[0], offset=offset)        
+        while True:
+            offset= random.random() + context_factor
+            
+            # augmenting dynamic_bbox,
+            dynamic_bbox_aug = augment_bbox(bbox=item_data["dynamic_bbox"], image_width=item_data["dynamic_image"].shape[1], image_height=item_data["dynamic_image"].shape[0], scale=self.sizes_config["search_image_scale"], shift=self.sizes_config["search_image_shift"], offset=offset)
+            dynamic_context = extend_bbox(dynamic_bbox_aug, image_width=item_data["dynamic_image"].shape[1], image_height=item_data["dynamic_image"].shape[0], offset=offset)        
+            
+            if self.check_validity( convert_xywh_to_xyxy(dynamic_context), convert_xywh_to_xyxy(item_data["prev_dynamic_bbox"])): 
+                break
+            
+            context_factor*=2
+
+        if context_factor > 32:
+            print("too much context factor")
+            print(item_data["prev_dynamic_bbox"])
+            print(dynamic_context)
+            print(context_factor)
+            
         dynamic_crop, dynamic_bbox = self.get_search_transform(item_data["dynamic_image"], item_data["dynamic_bbox"], context=dynamic_context)
         
+        # augmenting prev_dynamic_bbox, augmentation for prev_dynamic_context, might not be necessary
+        # prev_dynamic_bbox_aug = augment_bbox(bbox=item_data["prev_dynamic_bbox"], image_width=item_data["prev_dynamic_image_shape"][0], image_height=item_data["prev_dynamic_image_shape"][1], scale=self.sizes_config["search_image_scale"], shift=self.sizes_config["search_image_shift"], offset=offset)
+        # prev_dynamic_context = extend_bbox(prev_dynamic_bbox_aug, image_width=item_data["prev_dynamic_image_shape"][0], image_height=item_data["prev_dynamic_image_shape"][1], offset=offset)
+        prev_dynamic_bbox =  self.get_bbox_from_context(item_data["prev_dynamic_bbox"], context=dynamic_context)
         
         # augmenting search bbox
         search_bbox_aug = augment_bbox(bbox=item_data["search_bbox"], image_width=item_data["search_image"].shape[1], image_height=item_data["search_image"].shape[0], scale=self.sizes_config["search_image_scale"], shift=self.sizes_config["search_image_shift"], offset=offset)
@@ -320,10 +337,7 @@ class TrackingDataset(ABC):
         search_crop, search_bbox = self.get_search_transform(item_data["search_image"], item_data["search_bbox"], context=search_context)
         
         
-        # augmenting prev_dynamic_bbox 
-        prev_dynamic_bbox_aug = augment_bbox(bbox=item_data["prev_dynamic_bbox"], image_width=item_data["prev_dynamic_image_shape"][0], image_height=item_data["prev_dynamic_image_shape"][1], scale=self.sizes_config["search_image_scale"], shift=self.sizes_config["search_image_shift"], offset=offset)
-        prev_dynamic_context = extend_bbox(prev_dynamic_bbox_aug, image_width=item_data["prev_dynamic_image_shape"][0], image_height=item_data["prev_dynamic_image_shape"][1], offset=offset)
-        prev_dynamic_bbox =  self.get_bbox_from_context(item_data["prev_dynamic_bbox"], context=prev_dynamic_context)
+        
         
         return template_crop, template_bbox, search_crop, search_bbox, dynamic_crop, dynamic_bbox,prev_dynamic_bbox
 
