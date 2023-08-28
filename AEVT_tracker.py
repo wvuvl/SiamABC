@@ -15,7 +15,8 @@ import albumentations as albu
 import numpy as np
 import torch
 import torch.nn as nn
-
+import torchvision.transforms as transforms
+from core.train.preprocessing import torch_resize, normalize, numpy_to_tensor
 from core.utils.gaussian_map import gaussian_label_function
 from core.utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
 from core.utils.utils import to_device, limit, squared_size,  get_extended_image_crop, get_scaled_crop_bbox, clamp_bbox, convert_xywh_to_xyxy, extend_bbox
@@ -54,9 +55,9 @@ class Tracker(ABC):
 
     @staticmethod
     def _array_to_batch(x: np.ndarray) -> torch.Tensor:
-        x = np.transpose(x, (2, 0, 1))
-        x = np.expand_dims(x, 0)
-        return torch.from_numpy(x)
+        
+        toTensor = numpy_to_tensor()
+        return toTensor(x.astype('uint8')).unsqueeze(0)
 
     @abstractmethod
     def get_box_coder(self, tracking_config, cuda_id: int = 0):
@@ -81,15 +82,15 @@ class Tracker(ABC):
 
     @staticmethod
     def _get_default_transform(img_size):
-        pipeline = albu.Compose(
+        pipeline = transforms.Compose(
             [
-                albu.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                torch_resize(img_size),
+                normalize()
             ]
         )
 
-        def process(a):
-            r = pipeline(image=a)
-            return r["image"]
+        def process(a): 
+            return pipeline(a)
 
         return process
 
@@ -242,7 +243,6 @@ class AEVTTracker(Tracker):
         
         template_crop, context = get_extended_image_crop(
             image=image,
-            crop_size=self.tracking_config["template_size"],
             context=context
         )
         
@@ -269,7 +269,6 @@ class AEVTTracker(Tracker):
         
         dynamic_crop, dynamic_context = get_extended_image_crop(
             image=dynamic,
-            crop_size=self.tracking_config["instance_size"],
             context=context,
             padding_value=self.tracking_state.mean_color
         )
@@ -296,7 +295,6 @@ class AEVTTracker(Tracker):
         
         search_crop, search_context = get_extended_image_crop(
             image=search,
-            crop_size=self.tracking_config["instance_size"],
             context=dynamic_context,
             padding_value=self.tracking_state.mean_color
         )

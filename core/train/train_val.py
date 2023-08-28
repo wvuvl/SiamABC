@@ -19,6 +19,7 @@ from core.models.loss import AEVTLoss
 from core.utils.box_coder import TrackerDecodeResult
 from core.utils.utils import read_img, get_iou, plot_loss
 from core.utils.logger import create_logger
+from core.train.preprocessing import augmentation
 import core.constants as constants
 
 
@@ -210,7 +211,21 @@ class AEVT_train_val:
         logger.info('Train time: {} \n'.format(time.strftime("%H:%M:%S", time.gmtime(time.time() - start_train))))
         return train_losses, val_ious
     
+    def perform_batchwise_aug(self, inputs):
+        
+        template, search, dynamic, gaussian_val = inputs
+        
+        template = augmentation(template)
+        search = augmentation(search)
+        dynamic = augmentation(dynamic)
     
+        return tuple([template,
+                    search,
+                    dynamic,
+                    gaussian_val
+                    ]
+        )
+        
     def train_epoch(self, e, train_dl):
         self.model.train()
         train_epoch_losses = []
@@ -223,6 +238,7 @@ class AEVT_train_val:
         progress_bar = tqdm(train_dl)
         for batch in progress_bar:
             inputs, targets = self.get_input(batch)
+            inputs = self.perform_batchwise_aug(inputs)
             self.optimizer.zero_grad()
             outputs = self.model(inputs)
             loss = self.criterion(outputs, targets)

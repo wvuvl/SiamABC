@@ -34,7 +34,7 @@ train:
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         # clip_range: ${clip_range}
-        num_samples: 1000 # 100000
+        num_samples: 78000 # 100000
       transform: photometric
       regression_weight_label_size: ${tracker.score_size}
       sizes: ${sizes}

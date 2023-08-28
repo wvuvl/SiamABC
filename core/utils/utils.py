@@ -380,7 +380,7 @@ def clamp_bbox(bbox: np.array, shape: Tuple[int, int], min_side: int = 3) -> np.
 
 
 def get_extended_image_crop(
-    image: np.array, crop_size: int, context: np.array, padding_value: np.array = None) -> Tuple[np.array, np.array]:
+    image: np.array, context: np.array, padding_value: np.array = None) -> Tuple[np.array, np.array]:
     """
     
     
@@ -413,9 +413,9 @@ def get_extended_image_crop(
         crop, pad_top, pad_bottom, pad_left, pad_right, cv2.BORDER_CONSTANT, value=padding_value
     )
     
-    image = cv2.resize(padded_crop, (crop_size, crop_size), interpolation=cv2.INTER_LINEAR)
+    #image = cv2.resize(padded_crop, (crop_size, crop_size), interpolation=cv2.INTER_LINEAR) #not needed anymore
     
-    return image, context
+    return padded_crop, context
 
 def get_scaled_crop_bbox(
     bbox: np.array, crop_size: int, context: np.array) -> np.array:
@@ -590,6 +590,16 @@ def get_regression_weight_label(
     )
     return torch.from_numpy(label)
 
+def image_reformat(image: np.ndarray):
+    
+    if len(image.shape) not in {2, 3}:
+        raise ValueError(f"Image must have shape [H,W] or [H,W,C]. Got image with shape {image.shape}")
+
+    if len(image.shape) == 2:
+        image = np.expand_dims(image, 2)
+        image = np.concatenate((image,image,image), 2)
+    
+    return image
 
 def read_img(path: str) -> np.array:
     """
@@ -599,6 +609,7 @@ def read_img(path: str) -> np.array:
     """
     
     im = Image.open(path)
+    
     return np.asarray(im)
 
     # img = cv2.imread(path)
