@@ -8,123 +8,60 @@ import numpy as np
 import albumentations as A
 import matplotlib.pyplot as plt
 from PIL import Image, ImageFile
+import torchvision
+import kornia
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 BBox = Union[List, np.array]
 
-def sample_rand_uniform():
-    RAND_MAX = 2147483647
-    return (random.randint(0, RAND_MAX) + 1) * 1.0 / (RAND_MAX + 2)
 
 
-def sample_exp_two_sides(lambda_):
-    RAND_MAX = 2147483647
-    pos_or_neg = random.randint(0, RAND_MAX)
-    if (pos_or_neg % 2) == 0:
-        pos_or_neg = 1
-    else:
-        pos_or_neg = -1
+def appply_bbox_crop_aug_to_bbox(bbox, crop_bbox, crop_size):
+    new_x = (bbox[0] - crop_bbox[0]) * crop_size / crop_bbox[2]
+    new_y = (bbox[1] - crop_bbox[1]) * crop_size / crop_bbox[3]
+    new_w = bbox[2] * crop_size / crop_bbox[2]
+    new_h = bbox[3] * crop_size / crop_bbox[3]
+    if new_x < 0:
+        new_x, new_w = 0, new_w + new_x
+    if new_y < 0:
+        new_y, new_h = 0, new_y + new_h
+    new_w = min(crop_size, new_x + new_w) - new_x
+    new_h = min(crop_size, new_y + new_h) - new_y
+    return [int(new_x), int(new_y), int(new_w), int(new_h)]
 
-    rand_uniform = sample_rand_uniform()
-    return math.log(rand_uniform) / (lambda_ * pos_or_neg)
+def augment_bbox_crop(crop_bbox, bbox, image_height, image_width, scale, shift):
 
-def augment_bbox(bbox, image_height, image_width, scale, shift, offset):
-        '''
-        bbox: x1, y1, w, h
-        image_height: image height
-        image_width: image width   
-        
-        returns: x1, y1, w, h
-        '''
-        x, y, w, h = bbox
-        
-        xyxy_bbox = convert_xywh_to_xyxy(bbox)
-        center_x = (xyxy_bbox[0]+xyxy_bbox[2]) / 2
-        center_y = (xyxy_bbox[1]+xyxy_bbox[3]) / 2
-    
-        x_min = center_x-w*offset/2
-        y_min = center_y-h*offset/2
-        x_max = center_x+w*offset/2
-        y_max = center_y+h*offset/2
-        
+        x, y, w, h = crop_bbox
         
         scale_x = random.uniform(-scale, scale)
         scale_y = random.uniform(-scale, scale)
         shift_x = random.uniform(-shift, shift)
         shift_y = random.uniform(-shift, shift)
         
-        new_x = max(0, x - scale_x * w / 2 + shift_x, x_min)
-        new_y = max(0, y - scale_y * h / 2 + shift_y, y_min)
+        new_x = max(0, x - scale_x * w / 2 + shift_x)
+        new_y = max(0, y - scale_y * h / 2 + shift_y)
+        new_w = min(image_width, new_x + w + scale_x * w) - new_x
+        new_h = min(image_height, new_y + h + scale_y * h) - new_y
         
-        new_w = min(image_width, new_x + w + scale_x * w, x_max) - new_x
-        new_h = min(image_height, new_y + h + scale_y * h, y_max) - new_y
+        modified_bbox_crop = [int(new_x), int(new_y), int(new_w), int(new_h)]
         
-        return  [int(new_x), int(new_y), int(new_w), int(new_h)]
-    
-def goturn_shift(bbox, image_height, image_width, shift_motion_model=True,_lamda_shift=10, kContextFactor=2):
+
+        return  modified_bbox_crop
+
+def affine_crop_torch(image, bbox, out_size: int):
     """
-    bbox: x1, y1, w, h
-    motion model based shift
-    
-    returns: x1, y1, w, h
+    Get image specific image crop from `bbox` and resize it to (out_size, out_size) square
     """
-    
-    bbox = convert_xywh_to_xyxy(bbox)
-    
-    center_x = (bbox[0]+bbox[2]) / 2
-    center_y = (bbox[1]+bbox[3]) / 2
-
-    width = bbox[2]-bbox[0]
-    height = bbox[3]-bbox[1]
-
-    kMaxNumTries = 10
-
-    
-
-    first_time_x = True
-    new_center_x = -1
-    num_tries_x = 0
-
-    while ((first_time_x or (new_center_x < center_x - width * kContextFactor / 2)
-            or (new_center_x > center_x + width * kContextFactor / 2)
-            or ((new_center_x - width / 2) < 0)
-            or ((new_center_x + width / 2) > image_width))
-            and (num_tries_x < kMaxNumTries)):
-
-        if shift_motion_model:
-            new_x_temp = center_x + width * sample_exp_two_sides(_lamda_shift)
-        else:
-            rand_num = sample_rand_uniform()
-            new_x_temp = center_x + rand_num * (2 * width) - width
-
-        new_center_x = min(image_width - width / 2, max(width / 2, new_x_temp))
-        first_time_x = False
-        num_tries_x = num_tries_x + 1
-
-    first_time_y = True
-    new_center_y = -1
-    num_tries_y = 0
-
-    while ((first_time_y or (new_center_y < center_y - height * kContextFactor / 2)
-            or (new_center_y > center_y + height * kContextFactor / 2)
-            or ((new_center_y - height / 2) < 0)
-            or ((new_center_y + height / 2) > image_height))
-            and (num_tries_y < kMaxNumTries)):
-
-        if shift_motion_model:
-            new_y_temp = center_y + height * sample_exp_two_sides(_lamda_shift)
-        else:
-            rand_num = sample_rand_uniform()
-            new_y_temp = center_y + rand_num * (2 * height) - height
-
-        new_center_y = min(image_height - height / 2, max(height / 2, new_y_temp))
-        first_time_y = False
-        num_tries_y = num_tries_y + 1
-
-    x1 = new_center_x - width / 2
-    y1 = new_center_y - height / 2
-
-    return np.array([x1, y1, width, height]).astype('int32')
+    if len(image.shape) == 3: image = image.unsqueeze(0)
+    crop_bbox = [float(x) for x in bbox]
+    a = (out_size - 1) / (crop_bbox[2])
+    b = (out_size - 1) / (crop_bbox[3])
+    c = -a * crop_bbox[0]
+    d = -b * crop_bbox[1]
+    mapping = torch.tensor([[[a, 0, c], [0, b, d]]])
+    crop = kornia.geometry.transform.warp_affine(image, mapping, (out_size, out_size))
+    return crop.squeeze(0)
 
 
 #####
@@ -177,9 +114,10 @@ def extend_bbox(bbox: np.array, image_width, image_height, offset: float = 1.1) 
     output_width = max(1.0, offset * bbox[2])
     output_height = max(1.0, offset * bbox[3])
 
-    roi_left = max(0.0, bbox_center_x - (output_width / 2.))
-    roi_bottom = max(0.0, bbox_center_y - (output_height / 2.))
+    roi_left = max(0.0, bbox_center_x - (output_width / 2.)) #bbox_center_x - (output_width / 2.) # 
+    roi_bottom = max(0.0, bbox_center_y - (output_height / 2.)) # bbox_center_y - (output_height / 2.) #
 
+    # return np.array([roi_left, roi_bottom, output_width, output_height]).astype("int32")
     # New ROI width
     # -------------
     # 1. left_half should not go out of bound on the left side of the
@@ -198,20 +136,7 @@ def extend_bbox(bbox: np.array, image_width, image_height, offset: float = 1.1) 
 
     # Padded image location in the original image
     return np.array([roi_left, roi_bottom, roi_width, roi_height]).astype("int32")
-        
-    # if isinstance(offset, tuple):
-    #     if len(offset) == 4:
-    #         left, right, top, bottom = offset
-    #     elif len(offset) == 2:
-    #         w_offset, h_offset = offset
-    #         left = right = w_offset
-    #         top = bottom = h_offset
-    # else:
-    #     left = right = top = bottom = offset
-        
-    
 
-    # return np.array([x - w * left, y - h * top, w * (1.0 + right + left), h * (1.0 + top + bottom)]).astype("int32")
 
 
 def ensure_bbox_boundaries(bbox: np.array, img_shape: Tuple[int, int]) -> np.array:
@@ -379,8 +304,8 @@ def clamp_bbox(bbox: np.array, shape: Tuple[int, int], min_side: int = 3) -> np.
 ####
 
 
-def get_extended_image_crop(
-    image: np.array, context: np.array, padding_value: np.array = None) -> Tuple[np.array, np.array]:
+def get_extended_image_crop_torch(
+    image, context, padding_value = None):
     """
     
     
@@ -397,36 +322,39 @@ def get_extended_image_crop(
         crop_image: np.array
         crop_bbox: np.array
     """
-    if padding_value is None:
-        padding_value = np.mean(image, axis=(0, 1))
+    
     
     pad_left, pad_top = max(-context[0], 0), max(-context[1], 0)
-    pad_right, pad_bottom = max(context[0] + context[2] - image.shape[1], 0), max(
-        context[1] + context[3] - image.shape[0], 0
+    pad_right, pad_bottom = max(context[0] + context[2] - image.shape[2], 0), max(
+        context[1] + context[3] - image.shape[1], 0
     )
-    crop = image[
+    crop = image[:,
         context[1] + pad_top : context[1] + context[3] - pad_bottom,
         context[0] + pad_left : context[0] + context[2] - pad_right,
     ]
 
-    padded_crop = cv2.copyMakeBorder(
-        crop, pad_top, pad_bottom, pad_left, pad_right, cv2.BORDER_CONSTANT, value=padding_value
-    )
+    if pad_left==0 and pad_top==0 and pad_right==0 and pad_bottom==0:
+        return crop, context
     
-    #image = cv2.resize(padded_crop, (crop_size, crop_size), interpolation=cv2.INTER_LINEAR) #not needed anymore
+    if padding_value is None:
+        padding_value = image.mean((1,2))
+    padded_crop = torch.ones((3, context[3],context[2]))
+    padded_crop[0] = padded_crop[0]*padding_value[0]
+    padded_crop[1] = padded_crop[1]*padding_value[1]
+    padded_crop[2] = padded_crop[2]*padding_value[2]   
+    padded_crop[:, pad_top:pad_top+crop.shape[1], pad_left:pad_left+crop.shape[2]] = crop
+
     
     return padded_crop, context
 
-def get_scaled_crop_bbox(
-    bbox: np.array, crop_size: int, context: np.array) -> np.array:
+def get_bbox_from_crop_bbox(
+    bbox: np.array, context: np.array) -> np.array:
     
     padded_bbox = np.array([bbox[0] - context[0], bbox[1] - context[1], bbox[2], bbox[3]])
   
     padded_bbox = ensure_bbox_boundaries(padded_bbox, img_shape=[context[3], context[2]])
-
-    bbox = np.array(scale_bbox(bbox=padded_bbox, padded_crop_w=context[2], padded_crop_h=context[3], crop_size=crop_size))
     
-    return bbox, context
+    return padded_bbox, context
 
 def scale_bbox(bbox, padded_crop_w, padded_crop_h, crop_size):
     ''' 
@@ -601,24 +529,19 @@ def image_reformat(image: np.ndarray):
     
     return image
 
-def read_img(path: str) -> np.array:
-    """
-    Args:
-        path: image path
-    Returns: image
-    """
-    
-    im = Image.open(path)
-    
-    return np.asarray(im)
 
-    # img = cv2.imread(path)
-    # # print(path)
-    # # print(img.shape)
-    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) if len(img.shape) == 3 else cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+def _decode_image(image_path):
+    try:
+        image = torchvision.io.image.read_image(image_path, torchvision.io.image.ImageReadMode.RGB)    
+    except Exception as e:
+        image = Image.open(image_path)
+        image = np.asarray(image)
+        image = torch.from_numpy(image.transpose(2,0,1))
+        pass
     
-    # return img.copy()
-
+    image = image.to(torch.float)
+    image /= 255.
+    return image
 
 def get_max_side_near_bbox(bbox: np.array, frame: np.array) -> Tuple[np.array, str]:
     """
@@ -676,7 +599,7 @@ def get_negative_crop(bbox: np.array, image: np.array) -> np.array:
 
 
 def convert_xywh_to_xyxy(bbox: np.array) -> np.array:
-    return np.array([bbox[0], bbox[1], bbox[2]+bbox[0], bbox[3]+bbox[1]])
+    return [bbox[0], bbox[1], bbox[2]+bbox[0], bbox[3]+bbox[1]]
 
 
 

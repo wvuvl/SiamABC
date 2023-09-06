@@ -288,7 +288,7 @@ class CorrelationConcat(nn.Module):
         )
         self.weight = nn.Parameter(torch.empty(1, 2, 16, 16)) #gaussian map channels
         trunc_normal_(self.weight, std=.02)
-        
+
     def forward(self, z, x, d, g=None):
         
         b, c, w, h = x.size()

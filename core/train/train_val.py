@@ -17,9 +17,9 @@ import torch.backends.cudnn as cudnn
 from core.metrics import DatasetAwareMetric, BoxIoUMetric, TrackingFailureRateMetric, box_iou_metric
 from core.models.loss import AEVTLoss
 from core.utils.box_coder import TrackerDecodeResult
-from core.utils.utils import read_img, get_iou, plot_loss
+from core.utils.utils import _decode_image, get_iou, plot_loss
 from core.utils.logger import create_logger
-from core.train.preprocessing import augmentation
+# from core.train.preprocessing import augmentation
 import core.constants as constants
 
 
@@ -65,7 +65,7 @@ class AEVT_train_val:
         self.use_ddp = self.config["ddp"]
         # create model and move it to GPU with id rank
         self.device_id = gpu
-        if self.config["sync_bn"]: model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        if self.config["sync_bn"] : model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         
         if self.device_id is not None:
             torch.cuda.set_device(self.device_id)
@@ -114,6 +114,8 @@ class AEVT_train_val:
         
         cudnn.benchmark = True
         
+        # self.model = torch.compile(self.model)
+        
     def _get_batch_size(self, mode: str = "train") -> int:
         if isinstance(self.config["batch_size"], dict):
             return self.config["batch_size"][mode]
@@ -146,22 +148,23 @@ class AEVT_train_val:
 
         drop_last = loader_name == "train"
 
-        sampler = DistributedSampler(dataset) if self.use_ddp else None
+        sampler = DistributedSampler(dataset) if (self.use_ddp and loader_name == "train") else None
     
         should_shuffle = (sampler is None) and (loader_name == "train")
         batch_size = self._get_batch_size(loader_name)
         # Number of workers must not exceed batch size
         num_workers = min(batch_size, self.config["num_workers"])
-           
+    
         loader = DataLoader(
                 dataset=dataset,
                 batch_size=batch_size,
-                shuffle=should_shuffle,
+                shuffle=should_shuffle if loader_name == "train" else False,
                 sampler=sampler,
-                num_workers=num_workers,
+                num_workers=num_workers if loader_name == "train" else 1,
                 pin_memory=True,
                 drop_last=drop_last,
                 collate_fn=collate_fn,
+                persistent_workers=True
             )
         
             
@@ -192,9 +195,8 @@ class AEVT_train_val:
             train_epoch_loss, class_loss, regression_loss, search_sim_loss, dynamic_sim_loss = self.train_epoch(e, self.train_dl)
             train_losses.append(train_epoch_loss)
             
-            if self.val_dataset is not None:
-                val_dl, val_sampler = self._get_dataloader(self.val_dataset, "val")
-                if self.use_ddp: val_sampler.set_epoch(e)
+            if self.val_dataset is not None and self.device_id==0:
+                val_dl, _ = self._get_dataloader(self.val_dataset, "val")
                 val_iou = self.validate_network(val_dl)
                 val_ious.append(val_iou)
                 logger.info('Total Train loss: {:.3f}; Validation Iou: {:.3f} \n'.format(train_epoch_loss, val_iou))
@@ -211,20 +213,20 @@ class AEVT_train_val:
         logger.info('Train time: {} \n'.format(time.strftime("%H:%M:%S", time.gmtime(time.time() - start_train))))
         return train_losses, val_ious
     
-    def perform_batchwise_aug(self, inputs):
+    # def perform_batchwise_aug(self, inputs):
         
-        template, search, dynamic, gaussian_val = inputs
+    #     template, search, dynamic, gaussian_val = inputs
         
-        template = augmentation(template)
-        search = augmentation(search)
-        dynamic = augmentation(dynamic)
+    #     template = augmentation(template)
+    #     search = augmentation(search)
+    #     dynamic = augmentation(dynamic)
     
-        return tuple([template,
-                    search,
-                    dynamic,
-                    gaussian_val
-                    ]
-        )
+    #     return tuple([template,
+    #                 search,
+    #                 dynamic,
+    #                 gaussian_val
+    #                 ]
+    #     )
         
     def train_epoch(self, e, train_dl):
         self.model.train()
@@ -238,7 +240,7 @@ class AEVT_train_val:
         progress_bar = tqdm(train_dl)
         for batch in progress_bar:
             inputs, targets = self.get_input(batch)
-            inputs = self.perform_batchwise_aug(inputs)
+            # inputs = self.perform_batchwise_aug(inputs)
             self.optimizer.zero_grad()
             outputs = self.model(inputs)
             loss = self.criterion(outputs, targets)
@@ -261,21 +263,21 @@ class AEVT_train_val:
         self.model.eval()
                 
         _iou_threshold = 0.01
-        max_samples = self.config.get("max_val_samples", 200)
+        
         seq_ious = []
         
         with inference_mode(): # no_grad():
             for image_files, annotations, dataset_name in tqdm(data_loader, desc='Validating the dataset with the gt'):
                                 
-                image_t_0 = read_img(image_files[0][0])
+                image_t_0 = _decode_image(image_files[0][0])
                 self.tracker.initialize(image_t_0, list(map(int, annotations[0][0])))
-                num_samples = min(max_samples, len(annotations[0]))
+                num_samples =len(annotations[0])
                 ious = []
                 failure_map = []
                 dynamic_image = image_t_0
                 prev_dynamic_image = image_t_0
                 for i in range(1, num_samples):
-                    search_image = read_img(image_files[i][0])
+                    search_image = _decode_image(image_files[i][0])
                     bbox, cls_score = self.tracker.update(search=search_image, dynamic=dynamic_image, prev_dynamic=None)
                     iou = get_iou(np.array(bbox), np.array(list(map(int, annotations[0][i]))))
                     ious.append(iou)

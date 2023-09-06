@@ -2,7 +2,7 @@ from typing import Dict, Any, Optional
 
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
 import core.constants as constants
 
 
@@ -16,6 +16,7 @@ def calc_iou(reg_target: torch.Tensor, pred: torch.Tensor, smooth: float = 1.0) 
     area_intersect = w_intersect * h_intersect
     area_union = target_area + pred_area - area_intersect
     return (area_intersect + smooth) / (area_union + smooth)
+
 
 
 class BoxLoss(nn.Module):
@@ -56,12 +57,10 @@ class AEVTLoss(nn.Module):
         reg_weight_flatten = reg_weight.reshape(-1)
         pos_inds = torch.nonzero(reg_weight_flatten > 0).squeeze(1)
 
-        bbox_pred_flatten = bbox_pred_flatten[pos_inds]
-        reg_target_flatten = reg_target_flatten[pos_inds]
+        loss = self.regression_loss(bbox_pred_flatten[pos_inds], reg_target_flatten[pos_inds])
 
-        loss = self.regression_loss(bbox_pred_flatten, reg_target_flatten)
-
-        return loss
+        batch_ious = (calc_iou(reg_target=bbox_pred_flatten, pred=reg_target_flatten)*reg_weight_flatten).view(-1,16,16).mean((1,2))
+        return loss, batch_ious
 
     def _weighted_cls_loss(self, pred: torch.Tensor, label: torch.Tensor, select: torch.Tensor) -> torch.Tensor:
         if len(select.size()) == 0:
@@ -70,8 +69,9 @@ class AEVTLoss(nn.Module):
         label = torch.index_select(label, 0, select)
         return self.classification_loss(pred, label)
 
-    def _classification_loss(self, pred: torch.Tensor, label: torch.Tensor) -> torch.Tensor:
+    def _classification_loss(self, pred: torch.Tensor, label: torch.Tensor, batch_ious=None) -> torch.Tensor:
         pred = pred.view(-1)
+        # rel_label = (label*batch_ious.sigmoid()).view(-1)
         label = label.view(-1)
         pos = label.data.eq(1).nonzero().squeeze()
         neg = label.data.eq(0).nonzero().squeeze()
@@ -81,14 +81,15 @@ class AEVTLoss(nn.Module):
         return loss_pos * 0.5 + loss_neg * 0.5
 
     def forward(self, outputs: Dict[str, torch.Tensor], gt: Dict[str, Any]) -> Dict[str, Any]:
-        regression_loss = self._regression_loss(
+        regression_loss, batch_ious = self._regression_loss(
             bbox_pred=outputs[constants.TARGET_REGRESSION_LABEL_KEY],
             reg_target=gt[constants.TARGET_REGRESSION_LABEL_KEY],
             reg_weight=gt[constants.TARGET_REGRESSION_WEIGHT_KEY],
         )
         
         classification_loss = self._classification_loss(
-            pred=outputs[constants.TARGET_CLASSIFICATION_KEY], label=gt[constants.TARGET_CLASSIFICATION_KEY]
+            pred=outputs[constants.TARGET_CLASSIFICATION_KEY], label=gt[constants.TARGET_CLASSIFICATION_KEY],
+            batch_ious=batch_ious
         )
         
         

@@ -16,12 +16,12 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
-from core.train.preprocessing import torch_resize, normalize, numpy_to_tensor
+from core.train.preprocessing import normalize, numpy_to_tensor
 from core.utils.gaussian_map import gaussian_label_function
 from core.utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
-from core.utils.utils import to_device, limit, squared_size,  get_extended_image_crop, get_scaled_crop_bbox, clamp_bbox, convert_xywh_to_xyxy, extend_bbox
+from core.utils.utils import to_device, limit, squared_size,  get_extended_image_crop_torch, get_bbox_from_crop_bbox, scale_bbox, clamp_bbox, convert_xywh_to_xyxy, extend_bbox, image_reformat
 import core.constants as constants
-
+import core.utils.siamfc_preprocessing as siam_preprocessing
 class TrackingState:
     def __init__(self) -> None:
         super().__init__()
@@ -51,13 +51,13 @@ class Tracker(ABC):
         self._search_transform = self._get_default_transform(img_size=tracking_config["instance_size"])
         self._dynamic_transform = self._get_default_transform(img_size=tracking_config["instance_size"])
         self.window = self._get_tracking_window(tracking_config["windowing"], tracking_config["score_size"])
+        self.toTensor = numpy_to_tensor()
         self.to_device(cuda_id)
 
     @staticmethod
     def _array_to_batch(x: np.ndarray) -> torch.Tensor:
         
-        toTensor = numpy_to_tensor()
-        return toTensor(x.astype('uint8')).unsqueeze(0)
+        return x.unsqueeze(0)
 
     @abstractmethod
     def get_box_coder(self, tracking_config, cuda_id: int = 0):
@@ -84,7 +84,7 @@ class Tracker(ABC):
     def _get_default_transform(img_size):
         pipeline = transforms.Compose(
             [
-                torch_resize(img_size),
+                transforms.Resize((img_size, img_size)),
                 normalize()
             ]
         )
@@ -108,10 +108,8 @@ class Tracker(ABC):
         hc_z = bbox[3] + self.tracking_config["search_context"] * sum(bbox[2:])
         return max(round(np.sqrt(wc_z * hc_z)), 1)
 
-    def _preprocess_image(self, image: np.ndarray, transform: Callable) -> torch.Tensor:
-        img = transform(image[:, :, :3])
-        if image.shape[2] > 3:
-            img = np.concatenate([img, image[:, :, 3:]], axis=2)
+    def _preprocess_image(self, image, transform: Callable) -> torch.Tensor:
+        img = transform(image)
         img = self._array_to_batch(img).float()
         img = to_device(img, cuda_id=self.cuda_id)
         return img
@@ -231,28 +229,21 @@ class AEVTTracker(Tracker):
             bbox(list): [x, y, width, height]
                         x, y need to be 0-based
         """
-        rect = clamp_bbox(rect, image.shape)
+        rect = clamp_bbox(rect, image.shape[1:])
         self.tracking_state.prev_bbox = rect
         self.tracking_state.bbox = rect
         self.tracking_state.paths = deque([rect], maxlen=10)
-        self.tracking_state.mean_color = np.mean(image, axis=(0, 1))
+        self.tracking_state.mean_color = image.mean((0, 1))
         self._template_features = self.get_template_features(image, rect)
 
     def get_template_features(self, image, rect):
-        context = extend_bbox(rect, offset=self.tracking_config["template_bbox_offset"], image_width=image.shape[1], image_height=image.shape[0])
+        context = extend_bbox(rect, offset=self.tracking_config["template_bbox_offset"], image_width=image.shape[2], image_height=image.shape[1])
         
-        template_crop, context = get_extended_image_crop(
+        template_crop, context = get_extended_image_crop_torch(
             image=image,
             context=context
         )
-        
-        template_bbox, context = get_scaled_crop_bbox(
-            bbox=rect,
-            crop_size=self.tracking_config["template_size"],
-            context=context
-        )
-        
-        
+       
         img = self._preprocess_image(template_crop, self._template_transform)
         return self.net.get_features(img)
 
@@ -265,52 +256,50 @@ class AEVTTracker(Tracker):
             clss_score
         """
         
-        context = extend_bbox(self.tracking_state.bbox, offset=self.tracking_config["search_context"], image_width=dynamic.shape[1], image_height=dynamic.shape[0])
+        context = extend_bbox(self.tracking_state.bbox, offset=self.tracking_config["search_context"], image_width=dynamic.shape[2], image_height=dynamic.shape[1])
         
-        dynamic_crop, dynamic_context = get_extended_image_crop(
+        dynamic_crop, dynamic_context = get_extended_image_crop_torch(
             image=dynamic,
             context=context,
             padding_value=self.tracking_state.mean_color
         )
-        dynamic_bbox, dynamic_context = get_scaled_crop_bbox(
+        dynamic_bbox, dynamic_context = get_bbox_from_crop_bbox(
             bbox=self.tracking_state.bbox,
-            crop_size=self.tracking_config["instance_size"],
             context=context)
+        dynamic_bbox = scale_bbox(dynamic_bbox, context[2], context[3], self.tracking_config["instance_size"] )
         
         
         if prev_dynamic is not None:
-            prev_dynamic_bbox, _ = get_scaled_crop_bbox(
+            prev_dynamic_bbox, _ = get_bbox_from_crop_bbox(
                 bbox=self.tracking_state.prev_bbox,
-                crop_size=self.tracking_config["instance_size"],
                 context=dynamic_context)
+            prev_dynamic_bbox = scale_bbox(prev_dynamic_bbox, dynamic_context[2], dynamic_context[3], self.tracking_config["instance_size"] )
         else: 
             prev_dynamic_bbox=dynamic_bbox
         
-        grid_size = self.tracking_config["total_stride"]
-        crop_size = self.tracking_config["instance_size"]
-        dynamic_gaussian_label = gaussian_label_function(torch.tensor(convert_xywh_to_xyxy(dynamic_bbox)).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
-        prev_dynamic_gaussian_label = gaussian_label_function(torch.tensor(convert_xywh_to_xyxy(prev_dynamic_bbox)).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
-        gaussian_moving_map = torch.concat([prev_dynamic_gaussian_label, dynamic_gaussian_label], dim=0)
-
-        
-        search_crop, search_context = get_extended_image_crop(
+        search_crop, search_context = get_extended_image_crop_torch(
             image=search,
             context=dynamic_context,
             padding_value=self.tracking_state.mean_color
         )
-        search_bbox, search_context = get_scaled_crop_bbox(
+        search_bbox, search_context = get_bbox_from_crop_bbox(
             bbox=self.tracking_state.bbox,
-            crop_size=self.tracking_config["instance_size"],
             context=dynamic_context)
-        
-        
+        search_bbox = scale_bbox(search_bbox, dynamic_context[2], dynamic_context[3], self.tracking_config["instance_size"] )
         self.tracking_state.mapping = search_context
         self.tracking_state.prev_size = search_bbox[2:]
         
-        pred_bbox, pred_score = self.track(search_crop, dynamic_crop, gaussian_moving_map)
-        pred_bbox = self._rescale_bbox(pred_bbox, self.tracking_state.mapping)
-        pred_bbox = clamp_bbox(pred_bbox, search.shape)
         
+        grid_size = self.tracking_config["total_stride"]
+        crop_size = self.tracking_config["instance_size"]
+        dynamic_gaussian_label = gaussian_label_function(torch.tensor(dynamic_bbox).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
+        prev_dynamic_gaussian_label = gaussian_label_function(torch.tensor(prev_dynamic_bbox).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
+        gaussian_moving_map = torch.concat([prev_dynamic_gaussian_label, dynamic_gaussian_label], dim=0)
+        
+        pred_bbox, pred_score = self.track(search_crop, dynamic_crop, gaussian_moving_map)
+        
+        pred_bbox = self._rescale_bbox(pred_bbox, self.tracking_state.mapping)
+        pred_bbox = clamp_bbox(pred_bbox, search.shape[1:])
         self.tracking_state.prev_bbox = self.tracking_state.bbox
         self.tracking_state.bbox = pred_bbox
         

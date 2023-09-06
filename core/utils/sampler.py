@@ -38,7 +38,7 @@ class TrackSampler(ABC):
         for idx, (bbox, i_frame_shape) in tqdm(enumerate(zip(bboxes, frame_shape)), desc="filtering data - "):
             x,y,w,h = eval(bbox)
             im_w,im_h = eval(i_frame_shape)
-            if w <= 3 or h <= 3 or x >= im_w-3 or y >= im_h-3 or x<0 or y<0:
+            if w <= 15 or h <= 15 or x >= im_w-15 or y >= im_h-15 or x<0 or y<0:
                 indexes.append(idx)
         data = data.drop(indexes)
         data = data.reset_index(drop=True)
@@ -91,26 +91,23 @@ class TrackSampler(ABC):
                 
         search_items = self.data.iloc[track_indices]
         
-        # negatives allowed
         search_item = (search_items.sample(1).iloc[0]) #(search_items[(search_items["presence"] == 1)].sample(1).iloc[0])
 
-        dynamic_items = (
-            search_items[(search_items["frame_index"] <= search_item["frame_index"])
-                & (search_items["presence"] == 1) 
-            ]
-        )
         dynamic_item = (
-            dynamic_items[
-                (dynamic_items["frame_index"] > dynamic_items["frame_index"].iloc[-1] - 15) #- self.frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
+            search_items[
+                (search_items["frame_index"] > search_item["frame_index"] - 3) #- self.frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
+                & (search_items["frame_index"] <= search_item["frame_index"])
+                & (search_items["presence"] == 1) 
             ]
             .sample(1)
             .iloc[0]
         )
         
         prev_dynamic_item = (
-            dynamic_items[
-                (dynamic_items["frame_index"] > dynamic_item["frame_index"] - 15) #- self.frame_offset/4)
-                & (dynamic_items["frame_index"] <= dynamic_item["frame_index"] )
+            search_items[
+                (search_items["frame_index"] > dynamic_item["frame_index"] - 3) #- self.frame_offset/4)
+                & (search_items["frame_index"] <= dynamic_item["frame_index"])
+                & (search_items["presence"] == 1) 
             ]
             .sample(1)
             .iloc[0]
@@ -124,18 +121,18 @@ if __name__ == '__main__':
     # from utils import read_img
     
 
-    data_path = '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/AVIST.csv'
+    data_path = '/data/zaveri/code/AEVT/core/dataset_utils/got10k.csv'
     sampler = TrackSampler(data_path,negative_ratio=1.,frame_offset=70,num_samples=20000)
     sampler.parse_samples()
-    # samples = sampler.extract_sample(12)
+    
     start = time.time()
-    for i in trange(78000):
-        samples = sampler.extract_sample(12)
-        # template_image = read_img(samples["template"]["img_path"])
-        # search_image = read_img(samples["search"]["img_path"])
-        # dynamic_image = read_img(samples["dynamic"]["img_path"])
-        # prev_dynamic_image = read_img(samples["prev_dynamic"]["img_path"])
-    samples = sampler.data["img_path"]    
+    # for i in trange(78000):
+    #     samples = sampler.extract_sample(12)
+    #     template_image = read_img(samples["template"]["img_path"])
+    #     search_image = read_img(samples["search"]["img_path"])
+    #     dynamic_image = read_img(samples["dynamic"]["img_path"])
+    #     prev_dynamic_image = read_img(samples["prev_dynamic"]["img_path"])
+    # samples = sampler.data["img_path"]    
     # for i in tqdm(samples):
     #     prev_dynamic_image = read_img(i)    
     print(time.time()-start)
