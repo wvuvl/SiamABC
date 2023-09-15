@@ -55,7 +55,7 @@ for idx, seq in tqdm(enumerate(sequence_list)):
     w = w if (x+w)< img.shape[1] else img.shape[1]-1
     h = h if (y+h)< img.shape[0] else img.shape[0]-1
     
-    data.append([str(idx), class_name, 0, img_path, [x,y,w,h], [img.shape[1], img.shape[0]], 'coco2017',bbox_exist, bbox_border])
+    data.append([str(idx), str(idx), 0, img_path, [x,y,w,h], [img.shape[1], img.shape[0]], 'coco2017',bbox_exist, bbox_border])
     
 df = pd.DataFrame(data, columns=["sequence_id","track_id","frame_index","img_path","bbox","frame_shape","dataset","presence","near_corner"])
 df.to_csv("coco2017.csv")

@@ -14,7 +14,7 @@ from core.train import get_tracking_datasets
 # from core.train.trainer import get_trainer
 from core.train.train_val import AEVT_train_val
 from core.utils import prepare_experiment, create_logger
-from core.utils.torch_stuff import load_from_lighting
+from core.utils.torch_stuff import load_from_lighting, load_optimizer
 logger = create_logger(__name__)
 warnings.filterwarnings("ignore")
 
@@ -44,7 +44,9 @@ def train(gpu, ngpus_per_node, config: Dict[str, Any]) -> None:
     model = instantiate(config["model"])
     train_dataset, val_dataset = get_tracking_datasets(config)
     model = load_from_lighting(model, '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/experiments/2023-09-06-16-06-47_Tracking_AEVT/AEVT/trained_model_ckpt_2.pt')
+    
     trainer = AEVT_train_val(model=model, config=config, train=train_dataset, val=val_dataset, ngpus_per_node=ngpus_per_node, gpu=gpu)
+    trainer.optimizer = load_optimizer(trainer.optimizer, '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/experiments/2023-09-06-16-06-47_Tracking_AEVT/AEVT/trained_model_ckpt_2.pt')
     train_loss, val_ios = trainer.train_network()
 
 

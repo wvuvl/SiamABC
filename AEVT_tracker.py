@@ -109,8 +109,9 @@ class Tracker(ABC):
         return max(round(np.sqrt(wc_z * hc_z)), 1)
 
     def _preprocess_image(self, image, transform: Callable) -> torch.Tensor:
-        img = transform(image)
-        img = self._array_to_batch(img).float()
+        
+        img = self._array_to_batch(image).float()
+        img = transform(img)
         img = to_device(img, cuda_id=self.cuda_id)
         return img
 

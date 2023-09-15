@@ -12,7 +12,7 @@ from torch.utils.data import Dataset
 from torch.utils.data.dataloader import default_collate
 import torchvision.transforms as transforms
 
-from core.train.preprocessing import template_augmentation, search_augmentation
+from core.train.preprocessing import torch_resize
 from core.utils.gaussian_map import gaussian_label_function
 from core.utils.box_coder import AEVTBoxCoder
 from core.utils.utils import handle_empty_bbox, _decode_image, ensure_bbox_boundaries, get_extended_image_crop_torch, get_bbox_from_crop_bbox, scale_bbox, \
@@ -84,6 +84,7 @@ class TrackingDataset(ABC):
         self.max_deep_supervision_stride: Optional[int] = config.get("max_deep_supervision_stride", None)
         self.search_context = self.sizes_config["search_context"] * 2
         self.box_coder = AEVTBoxCoder(config["tracker"])
+        self.template_resize = torch_resize(self.sizes_config["template_image_size"])
         
     def __str__(self):
         return self.config["sampling"]["data_path"]
@@ -191,9 +192,9 @@ class TrackingDataset(ABC):
         gaussian_moving_map = torch.concat([prev_dynamic_gaussian_label, dynamic_gaussian_label], dim=0).float()
 
         
-        template_crop = template_augmentation(template_crop)
-        search_crop = search_augmentation(search_crop)
-        dynamic_crop = search_augmentation(dynamic_crop)
+        template_crop = self.template_resize(template_crop)
+        # search_crop = search_augmentation(search_crop)
+        # dynamic_crop = search_augmentation(dynamic_crop)
         # search_crop = self.torch_resize_search(search_crop)
         # dynamic_crop = self.torch_resize_search(dynamic_crop)
         
@@ -293,29 +294,29 @@ class TrackingDataset(ABC):
     
     def _get_crops(self, item_data):
         
+        template_crop, template_bbox = self.get_template_transform(
+            item_data["template_image"], item_data["template_bbox"], 
+        ) 
+
         context_factor = 2.0
         while True:
-            offset= random.random() + context_factor
+            offset = (random.random() * 0.5) + context_factor
             
             dynamic_context = extend_bbox(item_data["dynamic_bbox"], image_width=item_data["dynamic_image"].shape[2], image_height=item_data["dynamic_image"].shape[1], offset=offset)        
             if self.check_validity( convert_xywh_to_xyxy(dynamic_context), convert_xywh_to_xyxy(item_data["search_bbox"])) and \
                 self.check_validity( convert_xywh_to_xyxy(dynamic_context), convert_xywh_to_xyxy(item_data["prev_dynamic_bbox"])): 
                     break
+            else:
+                context_factor*=2
             
             if context_factor>64:
                 break
                 
-            context_factor*=2
+            
             
         if context_factor > 64:
             print("too much context factor")
             print(context_factor)
-        
-        offset= random.random() + random.randint(1,3)*context_factor
-        
-        template_crop, template_bbox = self.get_template_transform(
-            item_data["template_image"], item_data["template_bbox"], 
-        )       
         
         
         dynamic_crop, dynamic_bbox = self.get_search_transform(item_data["dynamic_image"], item_data["dynamic_bbox"], context=dynamic_context)

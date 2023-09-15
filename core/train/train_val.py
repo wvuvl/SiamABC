@@ -4,6 +4,7 @@ from tqdm import trange, tqdm
 import time
 import numpy as np
 import torch
+
 from hydra.utils import instantiate
 from torch import Tensor, inference_mode, save
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, DistributedSampler, Subset
@@ -21,6 +22,7 @@ from core.utils.utils import _decode_image, get_iou, plot_loss
 from core.utils.logger import create_logger
 # from core.train.preprocessing import augmentation
 import core.constants as constants
+import core.train.preprocessing as preprocessing
 
 
 logger = create_logger(__name__)
@@ -104,7 +106,7 @@ class AEVT_train_val:
         self.criterion = AEVTLoss(coeffs=config["loss"]["coeffs"]).to(self.device_id)
         
         self.train_dl, self.train_sampler = self._get_dataloader(self.train_dataset, "train")
-                
+        
         self.configure_optimizers()
         self.start_epoch = 0
         self.max_epochs = self.config["max_epochs"]
@@ -114,6 +116,7 @@ class AEVT_train_val:
         
         cudnn.benchmark = True
         
+        # self.test_dl, _ = self._get_dataloader(test, "test") if test is not None else (None,None)
         # self.model = torch.compile(self.model)
         
     def _get_batch_size(self, mode: str = "train") -> int:
@@ -172,7 +175,8 @@ class AEVT_train_val:
         return loader, sampler
     
     def configure_optimizers(self) -> Tuple[List[torch.optim.Optimizer], List[Dict[str, Any]]]:
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config.get('lr', 0.0001))
+        # self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config.get('lr', 0.0001))
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config.get('lr', 0.0001), momentum=0.9, weight_decay=1e-05)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
                                                         mode="max",
                                                         factor=0.5,
@@ -213,20 +217,30 @@ class AEVT_train_val:
         logger.info('Train time: {} \n'.format(time.strftime("%H:%M:%S", time.gmtime(time.time() - start_train))))
         return train_losses, val_ious
     
-    # def perform_batchwise_aug(self, inputs):
+    def perform_batchwise_aug(self, inputs):
         
-    #     template, search, dynamic, gaussian_val = inputs
+        template, search, dynamic, gaussian_val = inputs
         
-    #     template = augmentation(template)
-    #     search = augmentation(search)
-    #     dynamic = augmentation(dynamic)
-    
-    #     return tuple([template,
-    #                 search,
-    #                 dynamic,
-    #                 gaussian_val
-    #                 ]
-    #     )
+        template = preprocessing.color_augmentation(template)
+        color_params = preprocessing.color_augmentation._params
+        search = preprocessing.color_augmentation(search, params=color_params)
+        dynamic = preprocessing.color_augmentation(dynamic, params=color_params)
+
+
+        search = preprocessing.tracking_aug(search)
+        dynamic = preprocessing.tracking_aug(dynamic)
+
+
+        template = preprocessing.K_normalize(template)
+        search = preprocessing.K_normalize(search)
+        dynamic = preprocessing.K_normalize(dynamic)
+
+        return tuple([template,
+                    search,
+                    dynamic,
+                    gaussian_val
+                    ]
+        )
         
     def train_epoch(self, e, train_dl):
         self.model.train()
@@ -240,7 +254,7 @@ class AEVT_train_val:
         progress_bar = tqdm(train_dl)
         for batch in progress_bar:
             inputs, targets = self.get_input(batch)
-            # inputs = self.perform_batchwise_aug(inputs)
+            inputs = self.perform_batchwise_aug(inputs)
             self.optimizer.zero_grad()
             outputs = self.model(inputs)
             loss = self.criterion(outputs, targets)
@@ -292,6 +306,9 @@ class AEVT_train_val:
                 seq_ious.append(mean_iou)
                 
         return mean(seq_ious)
+
+    
+    
     
     def compute_loss(self, loss: Dict[str, Tensor]) -> Tuple[Tensor, Dict[str, Tensor]]:
         """

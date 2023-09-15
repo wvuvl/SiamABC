@@ -55,12 +55,12 @@ def visualize(frames: List[np.ndarray], tracked_bboxes: List[np.ndarray]):
 
 
 def main(
-    initial_bbox: List[int] = [163, 53, 45, 174],#  [489, 188, 497, 140], #[730, 253, 55, 58], #, #
+    initial_bbox: List[int] =[163, 53, 45, 174], # [730, 253, 55, 58], #[489, 188, 497, 140], # #  [489, 188, 497, 140], #, #
     video_path: str = "assets/test.mp4",
     output_path: str = "outputs/test.mp4",
     config_path: str = "core/config",
     config_name: str = "AEVT_tracker",
-    weights_path: str = "/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/models/small/trained_model_ckpt_20.pt",
+    weights_path: str = "/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/models/vulcan_new_AEVT/trained_model_ckpt_51.pt",
 ):
     tracker = get_tracker(config_path=config_path, config_name=config_name, weights_path=weights_path)
     video, metadata = iio.imread(video_path), iio.immeta(video_path, exclude_applied=False)

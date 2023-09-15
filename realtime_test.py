@@ -154,6 +154,6 @@ class Tracker:
 
 
 if __name__ == "__main__":
-    frames_path = '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/avist/sequences/archival_video_man'
-    AEVT_tracker = Tracker(frames_path, weights_path='/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/experiments/2023-08-25-18-32-28_Tracking_AEVT/AEVT/trained_model_ckpt_27.pt')
+    frames_path = '/media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/got10k/OTB/BlurCar1/img'
+    AEVT_tracker = Tracker(frames_path, weights_path='/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/experiments/2023-08-29-16-47-35_Tracking_AEVT/AEVT/trained_model_ckpt_33.pt')
     AEVT_tracker.track()
