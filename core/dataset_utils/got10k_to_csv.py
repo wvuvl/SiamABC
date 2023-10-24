@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import cv2
 import csv
+from PIL import Image
 from tqdm import tqdm
 from collections import OrderedDict
 
@@ -24,7 +25,7 @@ def printBB(dir, frames_folder, BB_file):
     return ArrayBB
 
     
-root = '/data/zaveri/SOTA_Tracking_datasets/GOT10k/GOT10k/train'
+root = '/new_local_storage/zaveri/SOTA_Tracking_datasets/GOT10k/GOT10k/train'
 
 
 file_path = os.path.join(root, 'list.txt')
@@ -33,12 +34,19 @@ with open(os.path.join(file_path)) as f:
 sequence_list = [dir_name[0] for dir_name in sequence_list]
 
 
-valid_vot_categories = '/data/zaveri/code/AEVT/core/dataset_utils/data_specs/got10k_vot_train_split.txt'
-seq_ids = pd.read_csv(valid_vot_categories, header=None, squeeze=True, dtype=np.int64).values.tolist()
+all_categories = '/new_local_storage/zaveri/code/SiamABC/core/dataset_utils/data_specs/got10k_train_full_split.txt'
+vot_exclude = '/new_local_storage/zaveri/code/SiamABC/core/dataset_utils/data_specs/got10k_vot_exclude.txt'
+# valid_vot_categories = '/data/zaveri/code/AEVT/core/dataset_utils/data_specs/got10k_vot_train_split.txt'
+
+seq_ids =np.array(pd.read_csv(all_categories, header=None).values.tolist(), dtype=np.int64).squeeze()
 sequence_list = [sequence_list[i] for i in seq_ids]
 
+vot_excluded_seqs =np.array(pd.read_csv(vot_exclude, header=None).values.tolist()).squeeze()
 
-
+print(len(sequence_list))
+for vot_seq in vot_excluded_seqs:
+    sequence_list.remove(vot_seq)
+print(len(sequence_list))
 data = []
 
 for idx, video in tqdm(enumerate(sequence_list)):
@@ -56,7 +64,10 @@ for idx, video in tqdm(enumerate(sequence_list)):
         
     for frame_num, (frame, anno, occ) in enumerate(zip(sorted(frames_list),video_gt, occlusion)):
         img_path = frame
-        img = cv2.imread(img_path)
+        # img = cv2.imread(img_path)
+        
+        img = Image.open(img_path)
+        image_width,image_height  = img.size
         
         x = int(anno[0])
         y = int(anno[1])
@@ -64,19 +75,14 @@ for idx, video in tqdm(enumerate(sequence_list)):
         h = int(anno[3])
         
         bbox_exist = 1 if occ==0 else 0
-        bbox_border = int(x<=0 or y<=0 or (x+w)>=img.shape[1]-1 or (y+h)>=img.shape[0]-1)
+        bbox_border = int(x<=0 or y<=0 or (x+w)>=image_width-1 or (y+h)>=image_height-1)
+
         
-        x = x if x>0 else 0
-        y = y if y>0 else 0
-        w = w if (x+w)< img.shape[1] else img.shape[1]-1
-        h = h if (y+h)< img.shape[0] else img.shape[0]-1
-        
-        data.append([str(idx), video, frame_num, img_path, [x,y,w,h], [img.shape[1], img.shape[0]], 'got10k',bbox_exist, bbox_border])
+        data.append([str(idx), video, frame_num, img_path, [x,y,w,h], [image_width, image_height], 'got10k',bbox_exist, bbox_border])
     # sanity save
-    df = pd.DataFrame(data, columns=["sequence_id","track_id","frame_index","img_path","bbox","frame_shape","dataset","presence","near_corner"])
-    df.to_csv("got10k.csv")
+    # df = pd.DataFrame(data, columns=["sequence_id","track_id","frame_index","img_path","bbox","frame_shape","dataset","presence","near_corner"])
+    # df.to_csv("got10k.csv")
 
 df = pd.DataFrame(data, columns=["sequence_id","track_id","frame_index","img_path","bbox","frame_shape","dataset","presence","near_corner"])
-df.to_csv("got10k.csv")
+df.to_csv("got10k_vot_excluded.csv")
         
-print(data)

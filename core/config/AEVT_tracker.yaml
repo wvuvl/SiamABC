@@ -5,8 +5,8 @@ hydra:
     dir: ../experiments/${now:%Y-%m-%d-%H-%M-%S}_Tracking_${experiment.name}
 
 defaults:
-  - backend: 1gpu
-  - dataset: avist_train
+  - backend: gpus
+  - dataset: got10k_train
   - model: AEVT
   - loss: AEVT_loss
   - optimizer: adam

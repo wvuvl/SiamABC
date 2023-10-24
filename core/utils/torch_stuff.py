@@ -7,7 +7,6 @@ from pytorch_toolbelt.utils import transfer_weights
 from torch import nn
 from torch.types import Device
 
-
 def load_optimizer(
     optimizer, checkpoint_path: str, map_location: Optional[Union[int, str]] = None, strict: bool = True
 ):
@@ -16,7 +15,6 @@ def load_optimizer(
     optimizer.load_state_dict(state_dict)
 
     return optimizer
-
 
 def load_from_lighting(
     model: nn.Module, checkpoint_path: str, map_location: Optional[Union[int, str]] = None, strict: bool = True

@@ -1,5 +1,7 @@
+
+
+
 # @package _global_
-visual_object_tracking_datasets: /data/fear
 
 sizes:
   search_image_size: ${tracker.instance_size}
@@ -7,7 +9,7 @@ sizes:
   search_context: ${tracker.search_context}
   search_bbox_ratio: ${tracker.bbox_ratio}
   template_bbox_offset: ${tracker.template_bbox_offset}
-  search_image_shift: 48
+  search_image_shift: 96
   search_image_scale: 0.35
   template_image_shift: 8
   template_image_scale: 0.05
@@ -16,52 +18,54 @@ sizes:
 
 frame_offset: 70
 negative_ratio: 0
-clip_range: True
+# clip_range: True
 
 dynamic_frame_offset:
   start_epoch: 20
   freq: 5
   step: 5
-  max_value: 150
+  max_value: 30
 
 train:
   datasets:
     - dataset_type: ${dataset_type}
-      root: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/avist
+      root: /luna_data/zaveri/SOTA_Tracking_datasets/GOT10k/GOT10k
       sampling:
-        _target_: model_training.dataset.track_sampling.TrackSampler
-        data_path: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/avist/AVIST.csv
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /luna_data/zaveri/code/SiamABC_colossal/core/dataset_utils/got10k_full.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
-        clip_range: ${clip_range}
-        num_samples: 100000
+        # clip_range: ${clip_range}
+        num_samples: 300000 # 100000
       transform: photometric
       regression_weight_label_size: ${tracker.score_size}
       sizes: ${sizes}
       stride: ${model.stride}
 
-# val:
-#   img_size: 256
-#   ann_path:
-#   datasets:
-#     - name: vot
-#       root_dir: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/vot2018
-#       version: 2018
-    # - name: got10k
-    #   root_dir: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/got10k
-    #   subset: val
+val:
+  img_size: 256
+  ann_path:
+  datasets:
+    - name: got10k
+      root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/GOT10k/GOT10k
+      subset: val
     # - name: nfs
-    #   root_dir: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/NFS
+    #   root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/NFS/NFS/NFS
+    # - name: vot
+    #   root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/vot2018
+    #   version: 2018
 
-# test:
-#   img_size: 256
-#   ann_path:
-#   datasets:
+test:
+  img_size: 256
+  ann_path:
+  datasets:
 #     - name: vot
 #       root_dir: $/media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/vot2018
 #       version: 2018
-#     - name: got10k
-#       root_dir: $/media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/got10k
-#       subset: val
-#     - name: nfs
-#       root_dir: $/media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/NFS
+    - name: got10k
+      root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/GOT10k/GOT10k
+      subset: val
+    # - name: nfs
+    #   root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/NFS/NFS/NFS
+    #   fps: 240
+

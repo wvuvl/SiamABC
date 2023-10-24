@@ -13,11 +13,12 @@ class TrackSampler(ABC):
         data_path: str,
         negative_ratio: float,
         frame_offset: int,
-        num_samples: int
+        num_samples: int,
+        filter_data=False,
     ):  
         self.data_path = data_path
         self.negative_ratio = negative_ratio
-        self.frame_offset = frame_offset
+        
         self.num_samples = num_samples
         self.data = None
         self.mapping = None
@@ -26,10 +27,35 @@ class TrackSampler(ABC):
         self.template_data = None
         self.num_tracks = None
 
+        self.frame_offset = 150
+        self.dynamic_frame_offset = 3
+        self.negative_sample_probability_threshold = 0.2
+        self.filter_data = filter_data
+        
 
     def __len__(self) -> int:
         return len(self.epoch_data)
-
+    
+    # def drop_seq_with_all_neg(self ,data):
+    #     mapping = data.groupby(["track_id"]).groups
+    #     indexes = []
+    #     for key in tqdm(mapping.keys(), desc="filtering all negative data - "):
+    #         items = data.iloc[mapping[key]]
+    #         present_item = (items[(items["presence"] == 1)])
+    #         if len(present_item)==0:
+    #             indexes.extend(mapping[key])
+    #         else:
+    #             for idx in present_item.iterrows():
+    #                 row = data.iloc[idx[0]]
+    #                 x,y,w,h = eval(row["bbox"])
+    #                 im_w,im_h = eval(row["frame_shape"])
+    #                 if w <= 3 or h <= 3 or x >= im_w-3 or y >= im_h-3 or x<0 or y<0:
+    #                     indexes.append(idx[0])    
+            
+    #     data = data.drop(indexes)
+    #     data = data.reset_index(drop=True)
+    #     data.to_csv('filtered_got10k.csv')
+    #     return data 
     
     def drop_bad_bboxes(self, data):
         bboxes = data["bbox"]
@@ -38,7 +64,8 @@ class TrackSampler(ABC):
         for idx, (bbox, i_frame_shape) in tqdm(enumerate(zip(bboxes, frame_shape)), desc="filtering data - "):
             x,y,w,h = eval(bbox)
             im_w,im_h = eval(i_frame_shape)
-            if w <= 15 or h <= 15 or x >= im_w-15 or y >= im_h-15 or x<0 or y<0:
+            
+            if w < 3 or h < 3 or x > im_w-3 or y > im_h-3:
                 indexes.append(idx)
         data = data.drop(indexes)
         data = data.reset_index(drop=True)
@@ -53,6 +80,7 @@ class TrackSampler(ABC):
         dropped_negatives = np.random.choice(negative.index, num_neg_samples_to_drop, replace=False)
         data = data.drop(dropped_negatives)
         data = data.reset_index(drop=True)
+        # if self.filter_data: data = self.drop_seq_with_all_neg(data)
         data = self.drop_bad_bboxes(data)
         return data
 
@@ -74,6 +102,8 @@ class TrackSampler(ABC):
         self.num_tracks = len(self.template_data["track_id"].unique())
         self.mapping = self.data.groupby(["track_id"]).groups
         self.resample()
+        print(f"Number of negative samples: {len(self.data[(self.data['presence'] == 0)])}")
+        
 
     
     """
@@ -91,64 +121,77 @@ class TrackSampler(ABC):
                 
         search_items = self.data.iloc[track_indices]
         
-        search_item = (search_items.sample(1).iloc[0]) #(search_items[(search_items["presence"] == 1)].sample(1).iloc[0])
-
-        # dynamic_item = (
-        #     search_items[
-        #         (search_items["frame_index"] > search_item["frame_index"] - 3) #- self.frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
-        #         & (search_items["frame_index"] <= search_item["frame_index"])
-        #         & (search_items["presence"] == 1) 
-        #     ]
-        #     .sample(1)
-        #     .iloc[0]
-        # )
+        frame_offset = 10 if template_item["dataset"]=='ytbb' else self.frame_offset
         
-        # prev_dynamic_item = (
-        #     search_items[
-        #         (search_items["frame_index"] > dynamic_item["frame_index"] - 3) #- self.frame_offset/4)
-        #         & (search_items["frame_index"] <= dynamic_item["frame_index"])
-        #         & (search_items["presence"] == 1) 
-        #     ]
-        #     .sample(1)
-        #     .iloc[0]
-        # )
-
-        dynamic_items = (
-            search_items[(search_items["frame_index"] <= search_item["frame_index"])
-                & (search_items["presence"] == 1) 
-            ]
-        )
-        dynamic_item = (
-            dynamic_items[
-                (dynamic_items["frame_index"] > dynamic_items["frame_index"].iloc[-1] - 3) #- self.frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
+        # clipping ?
+        dynamic_search_item = (
+                search_items[
+                    (search_items["presence"] == 1)
+                    # & (search_items["frame_index"] > template_item["frame_index"] - frame_offset)
+                    # & (search_items["frame_index"] < template_item["frame_index"] + frame_offset)
+                ]
+                .sample(1)
+                .iloc[0]
+            ) #(search_items[(search_items["presence"] == 1)].sample(1).iloc[0])
+        
+        
+        
+        search_item = (
+            search_items[
+                (search_items["frame_index"] <= dynamic_search_item["frame_index"] + frame_offset) #- self.dynamic_frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
+                # & (search_items["frame_index"] > dynamic_search_item["frame_index"] - frame_offset)
+                & (search_items["frame_index"] >= dynamic_search_item["frame_index"])
             ]
             .sample(1)
             .iloc[0]
         )
         
-        prev_dynamic_item = (
-            dynamic_items[
-                (dynamic_items["frame_index"] > dynamic_item["frame_index"] - 3) #- self.frame_offset/4)
-                & (dynamic_items["frame_index"] <= dynamic_item["frame_index"] )
+        dynamic_template_item = (
+            search_items[
+                (search_items["frame_index"] <= search_item["frame_index"]) # + frame_offset) #- self.frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
+                & (search_items["frame_index"] >= search_item["frame_index"] - frame_offset)
+                & (search_items["presence"] == 1)
             ]
             .sample(1)
             .iloc[0]
-        ) 
+        )
         
-        return dict(template=template_item, search=search_item, dynamic=dynamic_item, prev_dynamic=prev_dynamic_item)
+        prev_dynamic_search_item = (
+            search_items[
+                (search_items["frame_index"] > dynamic_search_item["frame_index"] - 3) #- self.frame_offset/4)
+                & (search_items["frame_index"] <= dynamic_search_item["frame_index"])
+                & (search_items["presence"] == 1)
+            ]
+            .sample(1)
+            .iloc[0]
+        )
+
+
+
+        # # mining negative samples for the classification loss robustness
+        # if np.random.rand() < self.negative_sample_probability_threshold:
+        #     search_items = (search_items[(search_items["presence"] == 0)])
+        #     if len(search_items)==0:
+        #         search_items = self.data[self.data["track_id"]!=template_item["track_id"]]
+        #         search_item = (search_items.sample(1).iloc[0])
+        #         search_item["presence"] = 0
+        #     else:
+        #         search_item=(search_items.sample(1).iloc[0])
+            
+            
+        return dict(template=template_item, dynamic_template=dynamic_template_item, search=search_item, dynamic_search=dynamic_search_item, prev_dynamic_search=prev_dynamic_search_item)
 
 if __name__ == '__main__':
     import time
     # from utils import read_img
-    
 
-    data_path = '/data/zaveri/code/AEVT/core/dataset_utils/got10k.csv'
-    sampler = TrackSampler(data_path,negative_ratio=1.,frame_offset=70,num_samples=20000)
+    data_path = '/new_local_storage/zaveri/code/old_AEVT_copy/core/dataset_utils/got10k.csv'
+    sampler = TrackSampler(data_path,negative_ratio=1.,frame_offset=70,num_samples=300000, filter_data=True)
     sampler.parse_samples()
-    
+    samples = sampler.extract_sample(12)
     start = time.time()
-    # for i in trange(78000):
-    #     samples = sampler.extract_sample(12)
+    for i in trange(300000):
+        samples = sampler.extract_sample(i)
     #     template_image = read_img(samples["template"]["img_path"])
     #     search_image = read_img(samples["search"]["img_path"])
     #     dynamic_image = read_img(samples["dynamic"]["img_path"])

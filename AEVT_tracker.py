@@ -11,24 +11,23 @@ File: https://github.com/PinataFarms/FEARTracker/blob/main/model_training/tracke
 from collections import deque
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Tuple, Callable, Union, Optional
+from statistics import mean
 import albumentations as albu
 import numpy as np
 import torch
 import torch.nn as nn
-import torchvision.transforms as transforms
-from core.train.preprocessing import normalize, numpy_to_tensor
+import cv2
 from core.utils.gaussian_map import gaussian_label_function
 from core.utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
-from core.utils.utils import to_device, limit, squared_size,  get_extended_image_crop_torch, get_bbox_from_crop_bbox, scale_bbox, clamp_bbox, convert_xywh_to_xyxy, extend_bbox, image_reformat
+from core.utils.utils import to_device, limit, squared_size,  get_extended_crop, clamp_bbox, convert_xywh_to_xyxy, extend_bbox
 import core.constants as constants
-import core.utils.siamfc_preprocessing as siam_preprocessing
+
 class TrackingState:
     def __init__(self) -> None:
         super().__init__()
         self.frame_h = 0
         self.frame_w = 0
         self.bbox: Optional[np.array] = None
-        self.prev_bbox: Optional[np.array] = None
         self.mapping: Optional[np.array] = None
         self.prev_size = None
         self.mean_color = None
@@ -41,7 +40,10 @@ class TrackingState:
 class Tracker(ABC):
     def __init__(self, model: nn.Module, cuda_id: Union[int, str] = 0, **tracking_config: Any) -> None:
         super().__init__()
+        
         self.cuda_id = cuda_id
+        tracking_config = tracking_config if 'tracking_config' not in tracking_config.keys() else  tracking_config['tracking_config']
+        # print(tracking_config)
         self.tracking_config = tracking_config
         self.tracking_state = TrackingState()
         self.net = model
@@ -49,15 +51,15 @@ class Tracker(ABC):
         self._template_features = None
         self._template_transform = self._get_default_transform(img_size=tracking_config["template_size"])
         self._search_transform = self._get_default_transform(img_size=tracking_config["instance_size"])
-        self._dynamic_transform = self._get_default_transform(img_size=tracking_config["instance_size"])
+        self._dynamic_search_transform = self._get_default_transform(img_size=tracking_config["instance_size"])
         self.window = self._get_tracking_window(tracking_config["windowing"], tracking_config["score_size"])
-        self.toTensor = numpy_to_tensor()
         self.to_device(cuda_id)
 
     @staticmethod
     def _array_to_batch(x: np.ndarray) -> torch.Tensor:
-        
-        return x.unsqueeze(0)
+        x = np.transpose(x, (2, 0, 1))
+        x = np.expand_dims(x, 0)
+        return torch.from_numpy(x)
 
     @abstractmethod
     def get_box_coder(self, tracking_config, cuda_id: int = 0):
@@ -82,15 +84,15 @@ class Tracker(ABC):
 
     @staticmethod
     def _get_default_transform(img_size):
-        pipeline = transforms.Compose(
+        pipeline = albu.Compose(
             [
-                transforms.Resize((img_size, img_size)),
-                normalize()
+                albu.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
 
-        def process(a): 
-            return pipeline(a)
+        def process(a):
+            r = pipeline(image=a)
+            return r["image"]
 
         return process
 
@@ -103,15 +105,12 @@ class Tracker(ABC):
         bbox[3] = max(3, round(bbox[3] * h_scale))
         return list(map(int, bbox))
 
-    def _get_scale(self, bbox: np.ndarray) -> int:
-        wc_z = bbox[2] + self.tracking_config["search_context"] * sum(bbox[2:])
-        hc_z = bbox[3] + self.tracking_config["search_context"] * sum(bbox[2:])
-        return max(round(np.sqrt(wc_z * hc_z)), 1)
 
-    def _preprocess_image(self, image, transform: Callable) -> torch.Tensor:
-        
-        img = self._array_to_batch(image).float()
-        img = transform(img)
+    def _preprocess_image(self, image: np.ndarray, transform: Callable) -> torch.Tensor:
+        img = transform(image[:, :, :3])
+        if image.shape[2] > 3:
+            img = np.concatenate([img, image[:, :, 3:]], axis=2)
+        img = self._array_to_batch(img).float()
         img = to_device(img, cuda_id=self.cuda_id)
         return img
 
@@ -198,6 +197,7 @@ class Tracker(ABC):
             ],
             dim=1,
         )[0]
+        
         s_c = limit(
             squared_size(pred_location[2] - pred_location[0], pred_location[3] - pred_location[1])
             / (squared_size(prev_size[0], prev_size[1]))
@@ -221,34 +221,93 @@ class Tracker(ABC):
 
 class AEVTTracker(Tracker):
     def get_box_coder(self, tracking_config, cuda_id: int = 0):
-        return AEVTBoxCoder(tracker_config=tracking_config)
+        return AEVTBoxCoder(tracking_config)
 
-    def initialize(self, image: np.ndarray, rect: np.array, **kwargs) -> None:
+    def initialize(self, image: np.ndarray, rect: np.array) -> None:
         """
         args:
             img(np.ndarray): RGB image
             bbox(list): [x, y, width, height]
                         x, y need to be 0-based
         """
-        rect = clamp_bbox(rect, image.shape[1:])
-        self.tracking_state.prev_bbox = rect
+        rect = clamp_bbox(rect, image.shape)
         self.tracking_state.bbox = rect
-        self.tracking_state.paths = deque([rect], maxlen=10)
-        self.tracking_state.mean_color = image.mean((0, 1))
-        self._template_features = self.get_template_features(image, rect)
-
-    def get_template_features(self, image, rect):
-        context = extend_bbox(rect, offset=self.tracking_config["template_bbox_offset"], image_width=image.shape[2], image_height=image.shape[1])
+        self.tracking_state.paths = deque([], maxlen=70)
         
-        template_crop, context = get_extended_image_crop_torch(
+        self.tracking_state.mean_color = np.mean(image, axis=(0, 1))
+                
+        self._template_features = self.get_template_features(image, rect)
+        self.dynamic_template_features = self._template_features.clone()
+        self.dynamic_search_features,_,_ = self.get_search_features(image, rect)
+        self.pscores = [1.]# deque([1.], maxlen=200)
+        self.avg_pscores = [1.]
+        self.N = self.tracking_config["N"]
+        
+        self.all_memory_imgs = deque([], maxlen=self.N)
+        self.classification_scores= deque([], maxlen=self.N)
+        
+        self.running_dynamic_image = image
+        self.running_dynamic_bbox = rect
+        
+        
+        self.offset = self.tracking_config["search_context"]
+        self.cls_threshold = 0.5
+        
+        self.idx = 0
+        self.slection_method = 'mean'
+        
+    @torch.no_grad()
+    def get_template_features(self, image, rect):
+        context = extend_bbox(rect, 
+                              offset=self.tracking_config["template_bbox_offset"], 
+                              image_width=image.shape[1], image_height=image.shape[0])
+        template_crop, template_bbox, _ = get_extended_crop(
             image=image,
-            context=context
+            bbox=rect,
+            context=context,
+            crop_size=self.tracking_config["template_size"],
         )
-       
+        
+        cv2.imwrite('temp.jpg',template_crop )
         img = self._preprocess_image(template_crop, self._template_transform)
         return self.net.get_features(img)
 
-    def update(self, search: np.ndarray, dynamic: np.ndarray, prev_dynamic: np.ndarray or  None,*kw) -> Dict[str, Any]:
+    @torch.no_grad()
+    def get_search_features(self, image, bbox):
+        context = extend_bbox(
+            bbox, 
+            offset=self.tracking_config["search_context"], 
+            image_width=image.shape[1], 
+            image_height=image.shape[0]
+            )
+        
+        search_crop, search_bbox, search_context = get_extended_crop(
+            image=image,
+            bbox=bbox,
+            crop_size=self.tracking_config["instance_size"],
+            padding_value=self.tracking_state.mean_color,
+            context=context
+        )
+        search_crop = self._preprocess_image(search_crop, self._search_transform)
+        return self.net.get_features(search_crop), search_bbox, search_context
+    
+    
+    def check_validity(self, bbox_window, bbox):
+        return bbox[0]>=bbox_window[0] and bbox[1]>=bbox_window[1] and bbox[2]<=bbox_window[2] and bbox[3]<=bbox_window[3]
+    
+    
+    def select_representatives(self):    
+        # indexes = np.argmax(self.classification_scores)
+        # self.dynamic_template_features = self.get_template_features(self.all_memory_imgs[indexes][0], self.all_memory_imgs[indexes][1])
+        # self.dynamic_search_features, _, _ = self.get_search_features(self.all_memory_imgs[indexes][0], self.all_memory_imgs[indexes][1])
+        
+        self.dynamic_template_features = self.get_template_features(self.running_dynamic_image, self.running_dynamic_bbox)
+        self.dynamic_search_features, _, _ = self.get_search_features(self.running_dynamic_image, self.running_dynamic_bbox)
+    
+    
+    
+    
+    def update(self, search: np.ndarray) -> Dict[str, Any]:
         """
         args:
             img(np.ndarray): RGB image
@@ -257,63 +316,52 @@ class AEVTTracker(Tracker):
             clss_score
         """
         
-        context = extend_bbox(self.tracking_state.bbox, offset=self.tracking_config["search_context"], image_width=dynamic.shape[2], image_height=dynamic.shape[1])
         
-        dynamic_crop, dynamic_context = get_extended_image_crop_torch(
-            image=dynamic,
-            context=context,
-            padding_value=self.tracking_state.mean_color
-        )
-        dynamic_bbox, dynamic_context = get_bbox_from_crop_bbox(
-            bbox=self.tracking_state.bbox,
-            context=context)
-        dynamic_bbox = scale_bbox(dynamic_bbox, context[2], context[3], self.tracking_config["instance_size"] )
+        pred_bbox, pred_score, sim_score = self.run_track(search)
+
+        # if pred_score>self.cls_threshold:
+        #     self.all_memory_imgs.append([search, pred_bbox])
+        #     self.classification_scores.append(pred_score)
         
-        
-        if prev_dynamic is not None:
-            prev_dynamic_bbox, _ = get_bbox_from_crop_bbox(
-                bbox=self.tracking_state.prev_bbox,
-                context=dynamic_context)
-            prev_dynamic_bbox = scale_bbox(prev_dynamic_bbox, dynamic_context[2], dynamic_context[3], self.tracking_config["instance_size"] )
-        else: 
-            prev_dynamic_bbox=dynamic_bbox
-        
-        search_crop, search_context = get_extended_image_crop_torch(
-            image=search,
-            context=dynamic_context,
-            padding_value=self.tracking_state.mean_color
-        )
-        search_bbox, search_context = get_bbox_from_crop_bbox(
-            bbox=self.tracking_state.bbox,
-            context=dynamic_context)
-        search_bbox = scale_bbox(search_bbox, dynamic_context[2], dynamic_context[3], self.tracking_config["instance_size"] )
-        self.tracking_state.mapping = search_context
-        self.tracking_state.prev_size = search_bbox[2:]
-        
-        
-        grid_size = self.tracking_config["total_stride"]
-        crop_size = self.tracking_config["instance_size"]
-        dynamic_gaussian_label = gaussian_label_function(torch.tensor(dynamic_bbox).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
-        prev_dynamic_gaussian_label = gaussian_label_function(torch.tensor(prev_dynamic_bbox).view(1,-1), feat_sz=grid_size, image_sz=crop_size)
-        gaussian_moving_map = torch.concat([prev_dynamic_gaussian_label, dynamic_gaussian_label], dim=0)
-        
-        pred_bbox, pred_score = self.track(search_crop, dynamic_crop, gaussian_moving_map)
-        
-        pred_bbox = self._rescale_bbox(pred_bbox, self.tracking_state.mapping)
-        pred_bbox = clamp_bbox(pred_bbox, search.shape[1:])
-        self.tracking_state.prev_bbox = self.tracking_state.bbox
+        # if pred_score >= mean(self.avg_pscores):
+        #     self.running_dynamic_image=search
+        #     self.running_dynamic_bbox=pred_bbox
+            
         self.tracking_state.bbox = pred_bbox
-        
         self.tracking_state.paths.append(pred_bbox)
+        
+        # self.pscores.append(pred_score)
+        # self.avg_pscores.append(mean(self.pscores))
+        
+        # self.idx+=1
+        
+        # if  self.idx%self.N==0 and len(self.all_memory_imgs)!=0:
+        #     self.select_representatives()
+            
         return pred_bbox, pred_score
 
-    def track(self, search_crop: np.ndarray, dynamic_crop: np.ndarray, gaussian_moving_map: torch.Tensor):
-        search_crop = self._preprocess_image(search_crop, self._search_transform)
-        dynamic_crop = self._preprocess_image(dynamic_crop, self._dynamic_transform)
-        
-        track_result = self.net.track(search=search_crop, dynamic=dynamic_crop, template_features=self._template_features, gaussian_val=to_device(gaussian_moving_map, cuda_id=self.cuda_id).unsqueeze(0).float())
-        return self._postprocess(track_result=track_result)
+    
+    def run_track(self, search):
+        search_features, search_bbox, search_context = self.get_search_features(search, self.tracking_state.bbox)
+        self.tracking_state.mapping = search_context
+        self.tracking_state.prev_size = search_bbox[2:]
+        pred_bbox, pred_score, sim_score, _ = self.track(search_features, self.dynamic_search_features, self.dynamic_template_features)
+        pred_bbox = self._rescale_bbox(pred_bbox, self.tracking_state.mapping)
+        pred_bbox = clamp_bbox(pred_bbox, search.shape)
+        return pred_bbox, pred_score, sim_score
 
+    @torch.no_grad()
+    def track(self, search_features, dynamic_search_features, dynamic_template_features):
+        
+        track_result = self.net.track(
+            search_features=search_features, 
+            dynamic_search_features=dynamic_search_features, 
+            template_features=self._template_features,
+            dynamic_template_features=dynamic_template_features
+            )
+        
+        return self._postprocess(track_result=track_result)
+    
     def _postprocess(self, track_result: Dict[str, torch.Tensor]) -> Tuple[np.array, float]:
         cls_score = track_result[constants.TARGET_CLASSIFICATION_KEY].detach().float().sigmoid()
         regression_map = track_result[constants.TARGET_REGRESSION_LABEL_KEY].detach().float()
@@ -326,4 +374,4 @@ class AEVTTracker(Tracker):
         cls_score = np.squeeze(cls_score)
         pred_bbox = self._postprocess_bbox(decoded_info=decoded_info, cls_score=cls_score, penalty=penalty)
         r_max, c_max = decoded_info.pred_coords[0]
-        return pred_bbox, cls_score[r_max, c_max]
+        return pred_bbox, cls_score[r_max, c_max].item(), track_result[constants.TRACKER_TARGET_SEARCH_SIM_SCORE].item(),  track_result[constants.TRACKER_ATTENTION_MAP]

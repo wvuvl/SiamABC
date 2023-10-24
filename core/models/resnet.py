@@ -150,14 +150,14 @@ def _resnet(arch, block, layers, pretrained, progress, **kwargs):
         try:
             model.load_state_dict(state_dict)
         except:
-            # model_keys = model.state_dict().keys()
-            # checkpoint_keys = state_dict.keys()
-            # for key in model_keys:
-            #     if key not in checkpoint_keys:
-            #         print("key %s is not found in the checkpoint." % key)
-            # for key in checkpoint_keys:
-            #     if key not in model_keys:
-            #         print("the checkpoint contains additional key %s" % key)
+            model_keys = model.state_dict().keys()
+            checkpoint_keys = state_dict.keys()
+            for key in model_keys:
+                if key not in checkpoint_keys:
+                    print("key %s is not found in the checkpoint." % key)
+            for key in checkpoint_keys:
+                if key not in model_keys:
+                    print("the checkpoint contains additional key %s" % key)
             model.load_state_dict(state_dict, strict=False)
     return model
 

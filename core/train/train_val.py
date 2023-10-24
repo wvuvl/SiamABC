@@ -4,30 +4,29 @@ from tqdm import trange, tqdm
 import time
 import numpy as np
 import torch
-
 from hydra.utils import instantiate
-from torch import Tensor, inference_mode, save
-from torch.utils.data import ConcatDataset, DataLoader, Dataset, DistributedSampler, Subset
+from torch import Tensor, inference_mode, load, save
+from torch.utils.data import ConcatDataset, DataLoader, Dataset, DistributedSampler
 from torch.utils.data.dataloader import default_collate
 from torchmetrics import MetricCollection
 from torchvision.ops import box_convert
 from statistics import mean
+import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.backends.cudnn as cudnn
 
 from core.metrics import DatasetAwareMetric, BoxIoUMetric, TrackingFailureRateMetric, box_iou_metric
 from core.models.loss import AEVTLoss
-from core.utils.box_coder import TrackerDecodeResult
-from core.utils.utils import _decode_image, get_iou, plot_loss
+from core.utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
+from core.utils.utils import read_img, get_iou, plot_loss
+
 from core.utils.logger import create_logger
-# from core.train.preprocessing import augmentation
 import core.constants as constants
-import core.train.preprocessing as preprocessing
 
 
 logger = create_logger(__name__)
 
-def get_collate_for_dataset(dataset: Union[Dataset, ConcatDataset]) -> Callable:
+def get_collate_for_dataset(dataset: Union[Dataset, ConcatDataset]):
     """
     Returns collate_fn function for dataset. By default, default_collate returned.
     If the dataset has method get_collate_fn() we will use it's return value instead.
@@ -61,13 +60,17 @@ class AEVT_train_val:
                 val: Dataset,
                 ngpus_per_node:int,
                 gpu:int,
-                ) -> None:
+                pretrained=None
+                ):
         super().__init__()
+        
+        
+        
         self.config = config
         self.use_ddp = self.config["ddp"]
         # create model and move it to GPU with id rank
         self.device_id = gpu
-        if self.config["sync_bn"] : model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
+        if self.config["sync_bn"]: model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
         
         if self.device_id is not None:
             torch.cuda.set_device(self.device_id)
@@ -105,7 +108,10 @@ class AEVT_train_val:
         self.dataset_aware_metric = DatasetAwareMetric(metric_name="box_iou", metric_fn=box_iou_metric)
         self.criterion = AEVTLoss(coeffs=config["loss"]["coeffs"]).to(self.device_id)
         
+        
         self.train_dl, self.train_sampler = self._get_dataloader(self.train_dataset, "train")
+        self.val_dl, self.val_sampler = self._get_dataloader(self.val_dataset, "val") if self.val_dataset is not None else (None,None)
+        
         
         self.configure_optimizers()
         self.start_epoch = 0
@@ -116,15 +122,12 @@ class AEVT_train_val:
         
         cudnn.benchmark = True
         
-        # self.test_dl, _ = self._get_dataloader(test, "test") if test is not None else (None,None)
-        # self.model = torch.compile(self.model)
-        
-    def _get_batch_size(self, mode: str = "train") -> int:
+    def _get_batch_size(self, mode: str = "train"):
         if isinstance(self.config["batch_size"], dict):
             return self.config["batch_size"][mode]
         return self.config["batch_size"]
     
-    def _get_dataloader(self, dataset: Dataset, loader_name: str) -> DataLoader:
+    def _get_dataloader(self, dataset: Dataset, loader_name: str):
         """
         Instantiate DataLoader for given dataset w.r.t to config and mode.
         It supports creating a custom sampler.
@@ -139,109 +142,104 @@ class AEVT_train_val:
         Returns:
 
         """
-        
-        
-        if loader_name == "val":
-            indices = np.arange(dataset.__len__())
-            val_size = int(0.1*dataset.__len__())
-            rand_sampling = list(np.random.choice(indices, val_size))
-            dataset = Subset(dataset,rand_sampling)
-        
         collate_fn = get_collate_for_dataset(dataset)
 
         drop_last = loader_name == "train"
 
-        sampler = DistributedSampler(dataset) if (self.use_ddp and loader_name == "train") else None
+        sampler = DistributedSampler(dataset) if self.use_ddp else None
     
         should_shuffle = (sampler is None) and (loader_name == "train")
         batch_size = self._get_batch_size(loader_name)
         # Number of workers must not exceed batch size
         num_workers = min(batch_size, self.config["num_workers"])
-    
         loader = DataLoader(
-                dataset=dataset,
-                batch_size=batch_size,
-                shuffle=should_shuffle if loader_name == "train" else False,
-                sampler=sampler,
-                num_workers=num_workers if loader_name == "train" else 1,
-                pin_memory=True,
-                drop_last=drop_last,
-                collate_fn=collate_fn,
-                persistent_workers=True
-            )
-        
-            
-            
+            dataset=dataset,
+            batch_size=batch_size,
+            shuffle=should_shuffle,
+            sampler=sampler,
+            num_workers=num_workers if loader_name == "train" else 0,
+            pin_memory=True,
+            drop_last=drop_last,
+            collate_fn=collate_fn,
+        )
         return loader, sampler
     
-    def configure_optimizers(self) -> Tuple[List[torch.optim.Optimizer], List[Dict[str, Any]]]:
-        # self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.config.get('lr', 0.0001))
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config.get('lr', 0.0001), momentum=0.9, weight_decay=1e-05)
+    def configure_optimizers(self):
+        print('Learning Rate - Set: ', 1e-4)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
+        # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config.get('lr', 0.0001), momentum=0.9, weight_decay=1e-05)
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
-                                                        mode="max",
+                                                        mode=self.config.get("metric_mode", "min"),
+                                                        patience=2,
                                                         factor=0.5,
-                                                        patience=5,
+                                                        verbose=True,
                                                         min_lr=1e-6)
     
     
     def train_network(self):  
         
+        # for g in self.optimizer.param_groups:
+        #     g['lr'] = 1e-6
+    
         train_losses = []
-        val_ious = []
+        val_ious = {}
         start_train = time.time()
         logger.info('Beginning network training.\n')
         for e in range(self.start_epoch+1, self.max_epochs + 1):
             
             if self.use_ddp: self.train_sampler.set_epoch(e)
+            
+            logger.info("Resampling Dataset(s) -- ")
+            datasets_to_update = self.train_dl.dataset.datasets if type(self.train_dl.dataset) is ConcatDataset else [self.train_dl.dataset]
+            for dataset in datasets_to_update:
+                dataset.resample()
+                if e > 15: # and len(datasets_to_update) > 1 : 
+                    # if dataset.item_sampler.dynamic_frame_offset<30: dataset.item_sampler.dynamic_frame_offset+=5
+                    if dataset.item_sampler.frame_offset<150: dataset.item_sampler.frame_offset+=5
+                # logger.info(f'Dynamic frame offset for dynamic search region={dataset.item_sampler.dynamic_frame_offset}')
+                logger.info(f'Dynamic frame offset for dynamic template={dataset.item_sampler.frame_offset}')
                 
-            # logger.info(self.scheduler.get_lr())
             
-            train_epoch_loss, class_loss, regression_loss, search_sim_loss, dynamic_sim_loss = self.train_epoch(e, self.train_dl)
+                    
+            logger.info(f"lr={self.optimizer.param_groups[0]['lr']}")
+            
+            train_epoch_loss, class_loss, regression_loss, search_sim_loss, dynamic_sim_loss, dissim_loss = self.train_epoch(e, self.train_dl)
+            self.scheduler.step(train_epoch_loss)
             train_losses.append(train_epoch_loss)
-            
-            if self.val_dataset is not None and self.device_id==0:
-                val_dl, _ = self._get_dataloader(self.val_dataset, "val")
-                val_iou = self.validate_network(val_dl)
-                val_ious.append(val_iou)
-                logger.info('Total Train loss: {:.3f}; Validation Iou: {:.3f} \n'.format(train_epoch_loss, val_iou))
-                self.scheduler.step(val_iou)
-            else:
-                logger.info('Train loss: {:.3f} \n'.format(train_epoch_loss))
-            
-            logger.info('Specific Train losses - \nClass Loss: {:.3f}; \nRegression Loss: {:.3f} \nSearch Sim Loss: {:.3f} \nDynamic Sim Loss: {:.3f} \n'\
-                    .format(class_loss, regression_loss, search_sim_loss, dynamic_sim_loss))
-            # if (e%10)==0 or e==self.max_epochs: 
             self.save_network_checkpoint(e)
+
+
+            logger.info('Train loss: {:.3f} \n'.format(train_epoch_loss))
+
+            logger.info('Specific Train losses - \nClass Loss: {:.3f}; \nRegression Loss: {:.3f} \nSearch Sim Loss: {:.3f} \nDynamic Sim Loss: {:.3f} \nDiss Sim Loss: {:.3f} \n'\
+                    .format(class_loss, regression_loss, search_sim_loss, dynamic_sim_loss, dissim_loss))
+            
+
+            if e%5==0:
+                if self.val_dl is not None:
+                    if self.use_ddp: self.val_sampler.set_epoch(e)
+                    val_iou = self.validate_network(self.val_dl)
+                    # logger.info('Train loss: {:.3f} \n'.format(train_epoch_loss))
+
+                    # logger.info('Specific Train losses - \nClass Loss: {:.3f}; \nRegression Loss: {:.3f} \nSearch Sim Loss: {:.3f} \nDynamic Sim Loss: {:.3f} \n'\
+                    #         .format(class_loss, regression_loss, search_sim_loss, dynamic_sim_loss))
+                    logger.info('Validation Iou: {} \n'.format(val_iou))
+                    for val_key in val_iou.keys():
+                        if val_key not in val_ious.keys():
+                            val_ious[val_key] = []
+                        val_ious[val_key].append(val_iou[val_key]) 
+
+            # if (e%10)==0 or e==self.max_epochs: 
+            
             plot_loss(train_losses, self.save_path, val_ious if len(val_ious)>0 else None)
+
+            
+            
             
         logger.info('Train time: {} \n'.format(time.strftime("%H:%M:%S", time.gmtime(time.time() - start_train))))
         return train_losses, val_ious
     
-    def perform_batchwise_aug(self, inputs):
-        
-        template, search, dynamic, gaussian_val = inputs
-        
-        template = preprocessing.color_augmentation(template)
-        color_params = preprocessing.color_augmentation._params
-        search = preprocessing.color_augmentation(search, params=color_params)
-        dynamic = preprocessing.color_augmentation(dynamic, params=color_params)
-
-
-        search = preprocessing.tracking_aug(search)
-        dynamic = preprocessing.tracking_aug(dynamic)
-
-
-        template = preprocessing.K_normalize(template)
-        search = preprocessing.K_normalize(search)
-        dynamic = preprocessing.K_normalize(dynamic)
-
-        return tuple([template,
-                    search,
-                    dynamic,
-                    gaussian_val
-                    ]
-        )
-        
+    
     def train_epoch(self, e, train_dl):
         self.model.train()
         train_epoch_losses = []
@@ -250,11 +248,11 @@ class AEVT_train_val:
         train_regression_loss = []
         search_similarity_loss = []
         dynamic_similarity_loss = []
+        dissimilarity_loss = []
         
         progress_bar = tqdm(train_dl)
         for batch in progress_bar:
             inputs, targets = self.get_input(batch)
-            inputs = self.perform_batchwise_aug(inputs)
             self.optimizer.zero_grad()
             outputs = self.model(inputs)
             loss = self.criterion(outputs, targets)
@@ -266,49 +264,52 @@ class AEVT_train_val:
             train_regression_loss.append(loss_dict[constants.TARGET_REGRESSION_LABEL_KEY].item())
             search_similarity_loss.append(loss_dict[constants.SIMSIAM_SEARCH_OUT_KEY].item())
             dynamic_similarity_loss.append(loss_dict[constants.SIMSIAM_DYNAMIC_OUT_KEY].item())
+            dissimilarity_loss.append(loss_dict[constants.SIMSIAM_NEGATIVE_OUT_KEY].item())
             
             total_loss.backward()
             self.optimizer.step() 
-            progress_bar.set_description(f'Training - Epoch {e}/{self.max_epochs} | loss {mean(train_epoch_losses):.3f}')
+            progress_bar.set_description(f'Training - Epoch {e}/{self.max_epochs} | loss {mean(train_epoch_losses):.3f} | cl_l {mean(train_classification_loss):.3f} | reg_l {mean(train_regression_loss):.3f} | s_sim_l {mean(search_similarity_loss):.3f} | d_sim_l {mean(dynamic_similarity_loss):.3f} | dissim_l {mean(dissimilarity_loss):.3f}')
         
-        return mean(train_epoch_losses), mean(train_classification_loss), mean(train_regression_loss), mean(search_similarity_loss), mean(dynamic_similarity_loss)
+        return mean(train_epoch_losses), mean(train_classification_loss), mean(train_regression_loss), mean(search_similarity_loss), mean(dynamic_similarity_loss), mean(dissimilarity_loss)
     
     def validate_network(self, data_loader, threshold:int = 0.5):
         self.model.eval()
                 
         _iou_threshold = 0.01
+        # max_samples = self.config.get("max_val_samples", 200)
+        seq_ious = {}
         
-        seq_ious = []
         
         with inference_mode(): # no_grad():
-            for image_files, annotations, dataset_name in tqdm(data_loader, desc='Validating the dataset with the gt'):
-                                
-                image_t_0 = _decode_image(image_files[0][0])
-                self.tracker.initialize(image_t_0, list(map(int, annotations[0][0])))
-                num_samples =len(annotations[0])
-                ious = []
-                failure_map = []
-                dynamic_image = image_t_0
-                prev_dynamic_image = image_t_0
-                for i in range(1, num_samples):
-                    search_image = _decode_image(image_files[i][0])
-                    bbox, cls_score = self.tracker.update(search=search_image, dynamic=dynamic_image, prev_dynamic=None)
-                    iou = get_iou(np.array(bbox), np.array(list(map(int, annotations[0][i]))))
-                    ious.append(iou)
-                    failure_map.append(int(iou < _iou_threshold))
+            progress_bar = tqdm(data_loader)
+            for batch in progress_bar:
+                for image_files, annotations, dataset_name in batch:
+                    if dataset_name not in seq_ious.keys():
+                        seq_ious[dataset_name]=[]
+                    image_t_0 = read_img(image_files[0])
+                    self.tracker.initialize(image_t_0, list(map(int, annotations[0])))
+                    num_samples = min(200, len(annotations)) if dataset_name=='lasot' or dataset_name=='nfs'  or dataset_name=='trackingnet' else len(annotations) #min(500, len(annotations))
+                    # print('num_samples: ', num_samples)
+                    ious = []
+                    failure_map = []
+                    for i in range(1, num_samples):
+                        search_image = read_img(image_files[i])
+                        bbox, cls_score = self.tracker.update(search=search_image)
+                        iou = get_iou(np.array(bbox), np.array(list(map(int, annotations[i]))))
+                        ious.append(iou)
+                        failure_map.append(int(iou < _iou_threshold))
+                        
+                    mean_iou = np.mean(ious)
+                    seq_ious[dataset_name].append(mean_iou)
                     
-                    # TODO: check if this threholding is proper
-                    # updating dynamic templates
-                    if cls_score > threshold:
-                        prev_dynamic_image=dynamic_image
-                        dynamic_image=search_image
-                mean_iou = np.mean(ious)
-                seq_ious.append(mean_iou)
-                
-        return mean(seq_ious)
+                    iou_str = 'Testing the dataset with the gt (IoU):'
+                    for key in seq_ious.keys(): iou_str+=f' | {key}={mean(seq_ious[key]):.3f}'   
+                    progress_bar.set_description(iou_str)
 
-    
-    
+        for key in seq_ious.keys():
+            seq_ious[key] = mean(seq_ious[key])
+            
+        return seq_ious
     
     def compute_loss(self, loss: Dict[str, Tensor]) -> Tuple[Tensor, Dict[str, Tensor]]:
         """
@@ -323,8 +324,9 @@ class AEVT_train_val:
     def get_input(self, data: Dict[str, Any]) -> Tuple[Tuple[torch.Tensor, ...], Dict[str, torch.Tensor]]:
         input_keys = [
             constants.TRACKER_TARGET_TEMPLATE_IMAGE_KEY,
+            constants.TRACKER_TARGET_DYNAMIC_TEMPLATE_IMAGE_KEY,
             constants.TRACKER_TARGET_SEARCH_IMAGE_KEY,
-            constants.TRACKER_TARGET_DYNAMIC_IMAGE_KEY,
+            constants.TRACKER_TARGET_DYNAMIC_SEARCH_IMAGE_KEY,
             constants.TRACKER_TARGET_GAUSSIAN_MOVING_MAP,
             constants.TRACKER_TARGET_NEGATIVE_IMAGE_KEY, # currently dont have it
         ]
@@ -340,9 +342,9 @@ class AEVT_train_val:
         targets_dict = self._convert_inputs(data, target_keys)
         inputs = [
             inputs_dict[constants.TRACKER_TARGET_TEMPLATE_IMAGE_KEY], 
+            inputs_dict[constants.TRACKER_TARGET_DYNAMIC_TEMPLATE_IMAGE_KEY], 
             inputs_dict[constants.TRACKER_TARGET_SEARCH_IMAGE_KEY],
-            inputs_dict[constants.TRACKER_TARGET_DYNAMIC_IMAGE_KEY], 
-            inputs_dict[constants.TRACKER_TARGET_GAUSSIAN_MOVING_MAP],
+            inputs_dict[constants.TRACKER_TARGET_DYNAMIC_SEARCH_IMAGE_KEY]
             ]
         if constants.TRACKER_TARGET_NEGATIVE_IMAGE_KEY in inputs_dict:
             inputs.append(inputs_dict[constants.TRACKER_TARGET_NEGATIVE_IMAGE_KEY])

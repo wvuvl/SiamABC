@@ -16,7 +16,6 @@ from core.train.dataloader import TrackingDataset, SequenceDatasetWrapper
 
 logger = create_logger(__name__)
 
-
 def get_tracking_test_datasets(config):
     test_datasets = []
     if "datasets" in config["test"]:
@@ -25,7 +24,8 @@ def get_tracking_test_datasets(config):
             logger.info("Valid dataset %s %d", str(ds), len(ds))
             test_datasets.append(ds)
         return ConcatDataset(test_datasets)
-    
+   
+   
 
 def get_tracking_datasets(config) -> [ConcatDataset, ConcatDataset]:
     train_datasets = []

@@ -1,15 +1,16 @@
 _target_: AEVT_tracker.AEVTTracker
-penalty_k: 0.062
-window_influence: 0.38
-lr: 0.765
+penalty_k: 0.062 #0.011 #0.062
+window_influence: 0.38 #0.214 #0.38
+lr:  0.765 #0.429 #0.765
 windowing: cosine
 total_stride: 16
 score_size: 16
-ratio: 0.94
+# ratio: 0.94
 stride: ${model.stride}
+smooth: true
 
 bbox_ratio: 0.5
-template_bbox_offset: 1.2
+template_bbox_offset: 0.2
 search_context: 2
 instance_size: 256
 template_size: 128

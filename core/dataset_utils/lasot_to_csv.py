@@ -54,7 +54,7 @@ for idx, seq_name in tqdm(enumerate(sequence_list)):
     with open(out_of_view_file, 'r') as f:
         out_of_view = [int(v) for v in list(csv.reader(f))[0]]
         
-        
+       
     for frame_num, (frame, anno, occ, oov) in enumerate(zip(sorted(frames_list),video_gt, occlusion, out_of_view)):
         img_path = frame
         img = cv2.imread(img_path)

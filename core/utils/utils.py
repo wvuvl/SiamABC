@@ -3,74 +3,14 @@ import random
 import torch
 import cv2
 import os
-import math
 import numpy as np
 import albumentations as A
 import matplotlib.pyplot as plt
 from PIL import Image, ImageFile
-import torchvision
-import kornia
-
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 BBox = Union[List, np.array]
 
-
-
-def appply_bbox_crop_aug_to_bbox(bbox, crop_bbox, crop_size):
-    new_x = (bbox[0] - crop_bbox[0]) * crop_size / crop_bbox[2]
-    new_y = (bbox[1] - crop_bbox[1]) * crop_size / crop_bbox[3]
-    new_w = bbox[2] * crop_size / crop_bbox[2]
-    new_h = bbox[3] * crop_size / crop_bbox[3]
-    if new_x < 0:
-        new_x, new_w = 0, new_w + new_x
-    if new_y < 0:
-        new_y, new_h = 0, new_y + new_h
-    new_w = min(crop_size, new_x + new_w) - new_x
-    new_h = min(crop_size, new_y + new_h) - new_y
-    return [int(new_x), int(new_y), int(new_w), int(new_h)]
-
-def augment_bbox_crop(crop_bbox, bbox, image_height, image_width, scale, shift):
-
-        x, y, w, h = crop_bbox
-        
-        scale_x = random.uniform(-scale, scale)
-        scale_y = random.uniform(-scale, scale)
-        shift_x = random.uniform(-shift, shift)
-        shift_y = random.uniform(-shift, shift)
-        
-        new_x = max(0, x - scale_x * w / 2 + shift_x)
-        new_y = max(0, y - scale_y * h / 2 + shift_y)
-        new_w = min(image_width, new_x + w + scale_x * w) - new_x
-        new_h = min(image_height, new_y + h + scale_y * h) - new_y
-        
-        modified_bbox_crop = [int(new_x), int(new_y), int(new_w), int(new_h)]
-        
-
-        return  modified_bbox_crop
-
-def affine_crop_torch(image, bbox, out_size: int):
-    """
-    Get image specific image crop from `bbox` and resize it to (out_size, out_size) square
-    """
-    if len(image.shape) == 3: image = image.unsqueeze(0)
-    crop_bbox = [float(x) for x in bbox]
-    a = (out_size - 1) / (crop_bbox[2])
-    b = (out_size - 1) / (crop_bbox[3])
-    c = -a * crop_bbox[0]
-    d = -b * crop_bbox[1]
-    mapping = torch.tensor([[[a, 0, c], [0, b, d]]])
-    crop = kornia.geometry.transform.warp_affine(image, mapping, (out_size, out_size))
-    return crop.squeeze(0)
-
-
-#####
-#####
-#####
-# FEAR code
-####
-####
-####
 
 def to_device(x: Union[torch.Tensor, torch.nn.Module], cuda_id: int = 0) -> torch.Tensor:
     return x.cuda(cuda_id) if torch.cuda.is_available() else x
@@ -107,36 +47,67 @@ def extend_bbox(bbox: np.array, image_width, image_height, offset: float = 1.1) 
     :return: extended bbox, [x_new, y_new, w_new, h_new]
     """
 
-    bbox_center_x = bbox[0]+(bbox[2]/2)
-    bbox_center_y = bbox[1]+(bbox[3]/2)
+    # bbox_center_x = bbox[0]+(bbox[2]/2)
+    # bbox_center_y = bbox[1]+(bbox[3]/2)
     
-    # Padded output width and height
-    output_width = max(1.0, offset * bbox[2])
-    output_height = max(1.0, offset * bbox[3])
+    # # Padded output width and height
+    # output_width = max(1.0, offset * bbox[2])
+    # output_height = max(1.0, offset * bbox[3])
 
-    roi_left = max(0.0, bbox_center_x - (output_width / 2.)) #bbox_center_x - (output_width / 2.) # 
-    roi_bottom = max(0.0, bbox_center_y - (output_height / 2.)) # bbox_center_y - (output_height / 2.) #
+    # roi_left = max(0.0, bbox_center_x - (output_width / 2.))
+    # roi_bottom = max(0.0, bbox_center_y - (output_height / 2.))
 
-    # return np.array([roi_left, roi_bottom, output_width, output_height]).astype("int32")
-    # New ROI width
-    # -------------
-    # 1. left_half should not go out of bound on the left side of the
-    # image
-    # 2. right_half should not go out of bound on the right side of the
-    # image
-    left_half = min(output_width / 2., bbox_center_x)
-    right_half = min(output_width / 2., image_width - bbox_center_x)
-    roi_width = max(1.0, left_half + right_half)
+    # # New ROI width
+    # # -------------
+    # # 1. left_half should not go out of bound on the left side of the
+    # # image
+    # # 2. right_half should not go out of bound on the right side of the
+    # # image
+    # left_half = min(output_width / 2., bbox_center_x)
+    # right_half = min(output_width / 2., image_width - bbox_center_x)
+    # roi_width = max(1.0, left_half + right_half)
 
-    # New ROI height
-    # Similar logic applied that is applied for 'New ROI width'
-    top_half = min(output_height / 2., bbox_center_y)
-    bottom_half = min(output_height / 2., image_height - bbox_center_y)
-    roi_height = max(1.0, top_half + bottom_half)
+    # # New ROI height
+    # # Similar logic applied that is applied for 'New ROI width'
+    # top_half = min(output_height / 2., bbox_center_y)
+    # bottom_half = min(output_height / 2., image_height - bbox_center_y)
+    # roi_height = max(1.0, top_half + bottom_half)
+    
 
-    # Padded image location in the original image
-    return np.array([roi_left, roi_bottom, roi_width, roi_height]).astype("int32")
+    # # Padded image location in the original image
+    # return np.array([roi_left, roi_bottom, roi_width, roi_height]).astype("int32")
+        
+    x, y, w, h = bbox
 
+    if isinstance(offset, tuple):
+        if len(offset) == 4:
+            left, right, top, bottom = offset
+        elif len(offset) == 2:
+            w_offset, h_offset = offset
+            left = right = w_offset
+            top = bottom = h_offset
+    else:
+        left = right = top = bottom = offset
+
+    return np.array([x - w * left, y - h * top, w * (1.0 + right + left), h * (1.0 + top + bottom)]).astype("int32")        
+    
+    # x, y, w, h = bbox
+
+    # if isinstance(offset, tuple):
+    #     if len(offset) == 4:
+    #         left, right, top, bottom = offset
+    #     elif len(offset) == 2:
+    #         w_offset, h_offset = offset
+    #         left = right = w_offset
+    #         top = bottom = h_offset
+    # else:
+    #     left = right = top = bottom = offset
+    
+    # new_x = max(x - w * left,0)
+    # new_y = max(y - h * top, 0)
+    # new_w = min(w * (1.0 + right + left), image_width-new_x-1)
+    # new_h = min(h * (1.0 + top + bottom), image_height-new_y-1)
+    # return np.array([new_x, new_y, new_w,new_h]).astype("int32")
 
 
 def ensure_bbox_boundaries(bbox: np.array, img_shape: Tuple[int, int]) -> np.array:
@@ -302,10 +273,8 @@ def clamp_bbox(bbox: np.array, shape: Tuple[int, int], min_side: int = 3) -> np.
 ####
 ####
 ####
-
-
-def get_extended_image_crop_torch(
-    image, context, padding_value = None):
+def get_extended_crop(
+    image: np.array, bbox: np.array, crop_size: int, context: np.array, padding_value: np.array = None) -> Tuple[np.array, np.array, np.array]:
     """
     
     
@@ -322,49 +291,32 @@ def get_extended_image_crop_torch(
         crop_image: np.array
         crop_bbox: np.array
     """
-    
+    if padding_value is None:
+        padding_value = np.mean(image, axis=(0, 1))
+    bbox_params = {"format": "coco", "min_visibility": 0, "label_fields": ["category_id"], "min_area": 0}
+    resize_aug = A.Compose([A.Resize(crop_size, crop_size)], bbox_params=bbox_params)
     
     pad_left, pad_top = max(-context[0], 0), max(-context[1], 0)
-    pad_right, pad_bottom = max(context[0] + context[2] - image.shape[2], 0), max(
-        context[1] + context[3] - image.shape[1], 0
+    pad_right, pad_bottom = max(context[0] + context[2] - image.shape[1], 0), max(
+        context[1] + context[3] - image.shape[0], 0
     )
-    crop = image[:,
+    crop = image[
         context[1] + pad_top : context[1] + context[3] - pad_bottom,
         context[0] + pad_left : context[0] + context[2] - pad_right,
     ]
 
-    if pad_left==0 and pad_top==0 and pad_right==0 and pad_bottom==0:
-        return crop, context
-    
-    if padding_value is None:
-        padding_value = image.mean((1,2))
-    padded_crop = torch.ones((3, context[3],context[2]))
-    padded_crop[0] = padded_crop[0]*padding_value[0]
-    padded_crop[1] = padded_crop[1]*padding_value[1]
-    padded_crop[2] = padded_crop[2]*padding_value[2]   
-    padded_crop[:, pad_top:pad_top+crop.shape[1], pad_left:pad_left+crop.shape[2]] = crop
-
-    
-    return padded_crop, context
-
-def get_bbox_from_crop_bbox(
-    bbox: np.array, context: np.array) -> np.array:
-    
+    padded_crop = cv2.copyMakeBorder(
+        crop, pad_top, pad_bottom, pad_left, pad_right, cv2.BORDER_CONSTANT, value=padding_value
+    )
     padded_bbox = np.array([bbox[0] - context[0], bbox[1] - context[1], bbox[2], bbox[3]])
-  
-    padded_bbox = ensure_bbox_boundaries(padded_bbox, img_shape=[context[3], context[2]])
     
-    return padded_bbox, context
+    if padded_crop is None:
+        print("None")    
+    padded_bbox = ensure_bbox_boundaries(padded_bbox, img_shape=padded_crop.shape[:2])
+    result = resize_aug(image=padded_crop, bboxes=[padded_bbox], category_id=["bbox"])
+    image, bbox = result["image"], np.array(result["bboxes"][0])
+    return image, bbox, context
 
-def scale_bbox(bbox, padded_crop_w, padded_crop_h, crop_size):
-    ''' 
-    bbox: x,y,w,h
-    search_region
-    '''
-    scale_w = crop_size/padded_crop_w
-    scale_h = crop_size/padded_crop_h
-    
-    return [bbox[0]*scale_w, bbox[1]*scale_h, bbox[2]*scale_w, bbox[3]*scale_h]
 
 def rescale_crop(image: np.array, bbox: np.array, out_size: int, padding: Any = (0, 0, 0)) -> Tuple[np.array, np.array]:
     """
@@ -518,30 +470,32 @@ def get_regression_weight_label(
     )
     return torch.from_numpy(label)
 
-def image_reformat(image: np.ndarray):
-    
-    if len(image.shape) not in {2, 3}:
-        raise ValueError(f"Image must have shape [H,W] or [H,W,C]. Got image with shape {image.shape}")
 
+def read_img(path: str) -> np.array:
+    """
+    Args:
+        path: image path
+    Returns: image
+    """
+    
+    image = Image.open(path)
+    image = np.asarray(image)
+    
     if len(image.shape) == 2:
         image = np.expand_dims(image, 2)
         image = np.concatenate((image,image,image), 2)
+    elif len(image.shape) > 2 and image.shape[2]>3:
+        image = image[:,:,:3]
     
     return image
 
-
-def _decode_image(image_path):
-    try:
-        image = torchvision.io.image.read_image(image_path, torchvision.io.image.ImageReadMode.RGB)    
-    except Exception as e:
-        image = Image.open(image_path)
-        image = np.asarray(image)
-        image = torch.from_numpy(image.transpose(2,0,1))
-        pass
+    # img = cv2.imread(path)
+    # # print(path)
+    # # print(img.shape)
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) if len(img.shape) == 3 else cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
     
-    image = image.to(torch.float)
-    image /= 255.
-    return image
+    # return img.copy()
+
 
 def get_max_side_near_bbox(bbox: np.array, frame: np.array) -> Tuple[np.array, str]:
     """
@@ -599,7 +553,7 @@ def get_negative_crop(bbox: np.array, image: np.array) -> np.array:
 
 
 def convert_xywh_to_xyxy(bbox: np.array) -> np.array:
-    return [bbox[0], bbox[1], bbox[2]+bbox[0], bbox[3]+bbox[1]]
+    return np.array([bbox[0], bbox[1], bbox[2]+bbox[0], bbox[3]+bbox[1]])
 
 
 
@@ -655,8 +609,11 @@ def plot_loss(train_losses, results_dir, val_ious=None):
     
     if val_ious is not None:
         plt.figure()
-        x_range = np.arange(1, len(val_ious)+1)
-        plt.plot(x_range, val_ious)
+        for key in val_ious.keys():
+            x_range = np.arange(1, len(val_ious[key])+1)
+            plt.plot(x_range, val_ious[key], label=key)
+
+        plt.legend()
         plt.title('Validation IoUs')
         plt.xlabel('Epoch')
         plt.ylabel('IoUs')
