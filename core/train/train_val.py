@@ -165,9 +165,12 @@ class AEVT_train_val:
         return loader, sampler
     
     def configure_optimizers(self):
-        print('Learning Rate - Set: ', 1e-4)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-4)
-        # self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.config.get('lr', 0.0001), momentum=0.9, weight_decay=1e-05)
+        lr = 1e-04
+        print('Learning Rate - Set: ', lr)
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+
+        # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1, gamma=0.5, verbose=True)
+        
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer,
                                                         mode=self.config.get("metric_mode", "min"),
                                                         patience=2,
@@ -204,7 +207,9 @@ class AEVT_train_val:
             logger.info(f"lr={self.optimizer.param_groups[0]['lr']}")
             
             train_epoch_loss, class_loss, regression_loss, search_sim_loss, dynamic_sim_loss, dissim_loss = self.train_epoch(e, self.train_dl)
+            
             self.scheduler.step(train_epoch_loss)
+            
             train_losses.append(train_epoch_loss)
             self.save_network_checkpoint(e)
 
@@ -215,7 +220,7 @@ class AEVT_train_val:
                     .format(class_loss, regression_loss, search_sim_loss, dynamic_sim_loss, dissim_loss))
             
 
-            if e%5==0:
+            if e%20==0:
                 if self.val_dl is not None:
                     if self.use_ddp: self.val_sampler.set_epoch(e)
                     val_iou = self.validate_network(self.val_dl)
@@ -250,7 +255,7 @@ class AEVT_train_val:
         dynamic_similarity_loss = []
         dissimilarity_loss = []
         
-        progress_bar = tqdm(train_dl)
+        progress_bar = tqdm(train_dl, ncols=200)
         for batch in progress_bar:
             inputs, targets = self.get_input(batch)
             self.optimizer.zero_grad()
@@ -281,7 +286,7 @@ class AEVT_train_val:
         
         
         with inference_mode(): # no_grad():
-            progress_bar = tqdm(data_loader)
+            progress_bar = tqdm(data_loader, ncols=200)
             for batch in progress_bar:
                 for image_files, annotations, dataset_name in batch:
                     if dataset_name not in seq_ious.keys():

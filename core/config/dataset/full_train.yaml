@@ -306,10 +306,11 @@ test:
     # - name: nfs
     #   root_dir: /new_local_storage/zaveri/SOTA_Tracking_datasets/NFS/NFS/NFS
     #   fps: 240
-    - name: lasot
-      root_dir: /new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT
-      file_path: /new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT/testing_set.txt
-      choose: 50
-    # - name: trackingnet
-    #   root_dir: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   chunk_folder: TRAIN_11
+    # - name: lasot
+    #   root_dir: /new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT
+    #   file_path: /new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT/testing_set.txt
+    #   choose: 50
+    - name: trackingnet
+      root_dir: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
+      chunk_folder: TRAIN_11
+      choose: -1

@@ -67,7 +67,7 @@ def test_network(tracker, data_loader, save_path, threshold:int = 0.5):
             ious = []            
             image_t_0 = read_img(image_files[0])
             tracker.initialize(image_t_0, list(map(int, annotations[0])))
-            num_samples =min(200, len(annotations)) if dataset_name=='lasot' or dataset_name=='nfs'  or dataset_name=='trackingnet' else len(annotations)
+            num_samples =len(annotations) #min(200, len(annotations)) if dataset_name=='lasot' or dataset_name=='nfs'  or dataset_name=='trackingnet' else len(annotations)
             annotations = annotations[:num_samples]
             video = [image_t_0]
             tracked_bboxes = [annotations[0].astype('int')]
@@ -214,7 +214,9 @@ def run_experiment(hydra_config: DictConfig) -> None:
     save_path = os.path.join(config["experiment"]["folder"], config["experiment"]["name"])
     if os.path.exists(save_path) == False: os.makedirs(save_path)
 
-    weights_path = '/new_local_storage/zaveri/code/experiments/2023-10-17-19-38-53_Tracking_AEVT/AEVT/trained_model_ckpt_2.pt'
+    weights_path = '/new_local_storage/zaveri/code/experiments/2023-10-31-18-28-55_Tracking_SiamABC_resnet50_layer_4_full/AEVT/trained_model_ckpt_20.pt'
+    config["model"]["model_size"] = 'L'
+    
     test(config, save_path, weights_path)
             
 

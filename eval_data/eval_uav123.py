@@ -54,7 +54,7 @@ def compute_success_error(gt_center, result_center):
 
 def get_result_bb(arch, seq):
     result_path = join(arch, seq + '.txt')
-    temp = np.loadtxt(result_path, delimiter=',').astype(np.float)
+    temp = np.loadtxt(result_path, delimiter=',').astype("float")
     return np.array(temp)
 
 
@@ -73,7 +73,7 @@ def eval_uav123_tune(result_path, json_path):
 
     for i in range(n_seq):
         seq = seqs[i]
-        gt_rect = np.array(annos[seq]['gt_rect']).astype(np.float)
+        gt_rect = np.array(annos[seq]['gt_rect']).astype("float")
         gt_center = convert_bb_to_center(gt_rect)
         bb = get_result_bb(result_path, seq)
         center = convert_bb_to_center(bb)
@@ -85,6 +85,6 @@ def eval_uav123_tune(result_path, json_path):
 
 if __name__ == "__main__":
     
-    result_path = '/new_local_storage/zaveri/code/experiments/2023-10-18-00-35-15_Tracking_SiamABC_dynamic_updates_TTA_style_every_150_resnet/AEVT/results/UAV123/AEVTTracker'
+    result_path = '/new_local_storage/zaveri/code/experiments/2023-10-17-01-22-46_Tracking_AEVT_do_dynamic_search/AEVT/results/UAV123/AEVTTracker'
     json_path = '/new_local_storage/zaveri/SOTA_Tracking_datasets/UAV123/UAV123.json'
     print(eval_uav123_tune(result_path, json_path))

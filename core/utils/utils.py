@@ -30,53 +30,11 @@ def get_iou(bb1: np.array, bb2: np.array) -> float:
     return iou
 
 
+
+
+
 def extend_bbox(bbox: np.array, image_width, image_height, offset: float = 1.1) -> np.array:
-    """
-    Increases bbox dimensions by offset*100 percent on each side.
 
-    IMPORTANT: Should be used with ensure_bbox_boundaries, as might return negative coordinates for x_new, y_new,
-    as well as w_new, h_new that are greater than the image size the bbox is extracted from.
-
-    :param bbox: [x, y, w, h]
-    :param offset: (left, right, top, bottom), or (width_offset, height_offset), or just single offset that specifies
-    fraction of spatial dimensions of bbox it is increased by.
-
-    For example, if bbox is a square 100x100 pixels, and offset is 0.1, it means that the bbox will be increased by
-    0.1*100 = 10 pixels on each side, yielding 120x120 bbox.
-
-    :return: extended bbox, [x_new, y_new, w_new, h_new]
-    """
-
-    # bbox_center_x = bbox[0]+(bbox[2]/2)
-    # bbox_center_y = bbox[1]+(bbox[3]/2)
-    
-    # # Padded output width and height
-    # output_width = max(1.0, offset * bbox[2])
-    # output_height = max(1.0, offset * bbox[3])
-
-    # roi_left = max(0.0, bbox_center_x - (output_width / 2.))
-    # roi_bottom = max(0.0, bbox_center_y - (output_height / 2.))
-
-    # # New ROI width
-    # # -------------
-    # # 1. left_half should not go out of bound on the left side of the
-    # # image
-    # # 2. right_half should not go out of bound on the right side of the
-    # # image
-    # left_half = min(output_width / 2., bbox_center_x)
-    # right_half = min(output_width / 2., image_width - bbox_center_x)
-    # roi_width = max(1.0, left_half + right_half)
-
-    # # New ROI height
-    # # Similar logic applied that is applied for 'New ROI width'
-    # top_half = min(output_height / 2., bbox_center_y)
-    # bottom_half = min(output_height / 2., image_height - bbox_center_y)
-    # roi_height = max(1.0, top_half + bottom_half)
-    
-
-    # # Padded image location in the original image
-    # return np.array([roi_left, roi_bottom, roi_width, roi_height]).astype("int32")
-        
     x, y, w, h = bbox
 
     if isinstance(offset, tuple):
@@ -90,24 +48,6 @@ def extend_bbox(bbox: np.array, image_width, image_height, offset: float = 1.1) 
         left = right = top = bottom = offset
 
     return np.array([x - w * left, y - h * top, w * (1.0 + right + left), h * (1.0 + top + bottom)]).astype("int32")        
-    
-    # x, y, w, h = bbox
-
-    # if isinstance(offset, tuple):
-    #     if len(offset) == 4:
-    #         left, right, top, bottom = offset
-    #     elif len(offset) == 2:
-    #         w_offset, h_offset = offset
-    #         left = right = w_offset
-    #         top = bottom = h_offset
-    # else:
-    #     left = right = top = bottom = offset
-    
-    # new_x = max(x - w * left,0)
-    # new_y = max(y - h * top, 0)
-    # new_w = min(w * (1.0 + right + left), image_width-new_x-1)
-    # new_h = min(h * (1.0 + top + bottom), image_height-new_y-1)
-    # return np.array([new_x, new_y, new_w,new_h]).astype("int32")
 
 
 def ensure_bbox_boundaries(bbox: np.array, img_shape: Tuple[int, int]) -> np.array:

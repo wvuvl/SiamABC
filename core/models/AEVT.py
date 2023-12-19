@@ -19,7 +19,8 @@ import torch.nn as nn
 # SIMSIAM_DYNAMIC_OUT_KEY = "SIMSIAM_DYNAMIC_OUT_KEY"
 
 
-from core.models.blocks import Encoder, EncoderResNet, EncoderRegNet, AdjustLayer, BoxTower, SpatialSelfCrossAttention, Correlation
+from core.models.blocks import Encoder, EncoderRegNet, AdjustLayer, BoxTower, SpatialSelfCrossAttention, Correlation, EncoderResNet
+from core.models.resnet import resnet50
 import core.constants as constants
 
 
@@ -53,20 +54,22 @@ class AEVTNet(nn.Module):
             base_encoder = Encoder(pretrained)
             self.encoder = nn.Sequential(*base_encoder.stages[:self.max_layer]) 
             adjust_in_channels = base_encoder.encoder_channels[max_layer2name[max_layer]]
-        elif model_size=='L':
+        elif model_size=='M':
             base_encoder = EncoderResNet(pretrained=pretrained) 
-            adjust_in_channels = base_encoder.last_layer_channels
+            adjust_in_channels = base_encoder.last_layer_channels            
             self.encoder = nn.Sequential(*base_encoder.layers)
+        elif model_size=='L':
+            base_encoder = resnet50(pretrained=True, last_layer = 'layer4') #EncoderResNet(pretrained=pretrained) 
+            adjust_in_channels = 2048 #base_encoder.last_layer_channels            
+            self.encoder = base_encoder #nn.Sequential(*base_encoder.layers)
+            print("-- USING CUSTOM RESNET -- ")
         else:
             base_encoder = EncoderRegNet(pretrained=pretrained) 
             adjust_in_channels = base_encoder.last_layer_channels
             self.encoder = nn.Sequential(*base_encoder.layers)
-
-
-
-        self.neck = AdjustLayer(
-            in_channels=adjust_in_channels, out_channels=adjust_channels
-            )
+        
+        
+        self.neck = AdjustLayer(in_channels=adjust_in_channels, out_channels=adjust_channels)
         
         
         self.SpatialSelfCrossAttention = SpatialSelfCrossAttention(in_channels=adjust_channels)
@@ -104,8 +107,9 @@ class AEVTNet(nn.Module):
         )
         # self.correlation_block = Correlation(num_channels=adjust_channels)
         self.similarity = nn.CosineSimilarity(dim=1)
+        self.similarity_avgpool = nn.AdaptiveAvgPool2d((16, 16))
+        # self.sim_maxpool = nn.MaxPool2d((2,2),(2,2)) 
         
-
     def feature_extractor(self, x: torch.Tensor) -> torch.Tensor:
         x = self.encoder(x)
         return x
@@ -121,10 +125,11 @@ class AEVTNet(nn.Module):
     
     def calc_sim(self, x1, x2):
         
-        x1 = self.avgpool(x1)
+        x1 = self.similarity_avgpool(x1) #256x8x8 -> 256x16x16
         x1 = torch.flatten(x1, 1)
-        x2 = self.avgpool(x2)
+        # x2 = self.sim_maxpool(x2) #256x16x16 -> 256x8x8
         x2 = torch.flatten(x2, 1)
+        
         return self.similarity(x1, x2).mean()
         
     def simsiam_forward(self, x1, x2):
@@ -151,6 +156,57 @@ class AEVTNet(nn.Module):
         return p1, p2, z1.detach(), z2.detach()
     
     
+    # # no nothing, no att, no cupled-corr
+    # def forward(self, x: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]) -> Dict[str, torch.Tensor or List[torch.Tensor]]:
+    #     template, dynamic_template, search, dynamic_search = x
+        
+    #     template_features = self.get_features(template)
+    #     dynamic_template_features = self.get_features(dynamic_template)
+    #     self_attention_template_features, cross_attention_template_features =  dynamic_template_features, template_features
+
+        
+    #     search_features = self.get_features(search)
+    #     dynamic_search_features = self. get_features(dynamic_search)
+    #     self_attention_search_features, cross_attention_search_features = search_features, dynamic_search_features
+
+    #     bbox_pred, cls_pred =  self.connector(template_features=cross_attention_template_features, self_attention_features=self_attention_search_features, cross_attention_features=cross_attention_search_features)
+
+    #     simsiam_out_search = self.simsiam_forward(cross_attention_template_features, self_attention_search_features)
+    #     simsiam_out_dynamic = self.simsiam_forward(cross_attention_template_features, cross_attention_search_features)
+        
+        
+    #     return {
+    #         constants.TARGET_REGRESSION_LABEL_KEY: bbox_pred,
+    #         constants.TARGET_CLASSIFICATION_KEY: cls_pred,
+    #         constants.SIMSIAM_SEARCH_OUT_KEY: simsiam_out_search,
+    #         constants.SIMSIAM_DYNAMIC_OUT_KEY: simsiam_out_dynamic
+    #     }
+
+    
+    # def track(
+    #     self,
+    #     search_features: torch.Tensor,
+    #     dynamic_search_features: torch.Tensor,
+    #     template_features: torch.Tensor,
+    #     dynamic_template_features: torch.Tensor
+    # ) -> Dict[str, torch.Tensor]:
+        
+        
+    #     self_attention_template_features, cross_attention_template_features =  dynamic_template_features, template_features
+    #     self_attention_search_features, cross_attention_search_features = search_features, dynamic_search_features
+    #     bbox_pred, cls_pred =  self.connector(template_features=cross_attention_template_features, self_attention_features=self_attention_search_features, cross_attention_features=cross_attention_search_features)
+        
+    #     sim_score = self.calc_sim(cross_attention_template_features, search_features*cls_pred) #cross_attention_search_features*cls_pred) #cross_attention_search_features*cls_pred)
+        
+    #     return {
+    #         constants.TARGET_REGRESSION_LABEL_KEY: bbox_pred,
+    #         constants.TARGET_CLASSIFICATION_KEY: cls_pred,
+    #         constants.TRACKER_TARGET_SEARCH_SIM_SCORE: sim_score,
+    #         constants.TRACKER_ATTENTION_MAP: cross_attention_search_features#*cls_pred
+            
+    #     }
+        
+          
     def forward(self, x: Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]) -> Dict[str, torch.Tensor or List[torch.Tensor]]:
         template, dynamic_template, search, dynamic_search = x
         
@@ -192,7 +248,7 @@ class AEVTNet(nn.Module):
 
         bbox_pred, cls_pred =  self.connector(template_features=cross_attention_template_features, self_attention_features=cross_attention_search_features, cross_attention_features=self_attention_search_features)
         
-        sim_score = self.calc_sim(cross_attention_template_features, cross_attention_search_features*cls_pred) #cross_attention_search_features*cls_pred)
+        sim_score = self.calc_sim(cross_attention_template_features, search_features*cls_pred) #cross_attention_search_features*cls_pred) #cross_attention_search_features*cls_pred)
         
         return {
             constants.TARGET_REGRESSION_LABEL_KEY: bbox_pred,

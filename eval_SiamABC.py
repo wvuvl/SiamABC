@@ -6,7 +6,7 @@ from eval_data.utils import  load_dataset, poly_iou, get_axis_aligned_bbox, cent
 
 from eval_toolkit.pysot.datasets import VOTDataset
 from eval_toolkit.pysot.evaluation import EAOBenchmark
-from eval_data import eval_otb, eval_got10k, eval_lasot, eval_nfs, eval_uav123, eval_avist
+from eval_data import eval_otb, eval_got10k, eval_lasot, eval_nfs, eval_uav123, eval_avist, eval_tcolor128, eval_dtb70, eval_trackingnet, eval_itb
 from tqdm import tqdm
 
 # -----------------------------------------------
@@ -30,8 +30,6 @@ def track_tune(tracker, video, dataset_name, penalty_k, window_influence, lr):
         re_video_path = os.path.join(tracker_path, video['name'])
         if not os.path.exists(re_video_path): os.makedirs(re_video_path)
         result_path = os.path.join(re_video_path, '{:s}.txt'.format(video['name']))
-    elif 'NFS' in benchmark_name or 'UAV' in benchmark_name:
-        result_path = os.path.join(tracker_path, '{:s}.txt'.format(video['video_dir']))
     else:
         result_path = os.path.join(tracker_path, '{:s}.txt'.format(video['name']))
 
@@ -43,7 +41,7 @@ def track_tune(tracker, video, dataset_name, penalty_k, window_influence, lr):
         if benchmark_name.startswith('OTB'):
             print('results exist')
             return tracker_path
-        elif benchmark_name.startswith('VOT') or benchmark_name.startswith('GOT10K') or benchmark_name.startswith('LASOT') or benchmark_name.startswith('NFS') or benchmark_name.startswith('UAV') or benchmark_name.startswith('AVIST') :
+        elif benchmark_name.startswith('VOT') or benchmark_name.startswith('GOT10K') or benchmark_name.startswith('LASOT') or benchmark_name.startswith('NFS') or benchmark_name.startswith('UAV') or benchmark_name.startswith('AVIST') or benchmark_name.lower().startswith('tcolor') or benchmark_name.startswith('DTB') or benchmark_name.lower().startswith('trackingnet')  or benchmark_name.startswith('ITB'):
             print('results exist')
             return 0
         else:
@@ -81,7 +79,7 @@ def track_tune(tracker, video, dataset_name, penalty_k, window_influence, lr):
             regions.append([float(0)])
 
     # save results for OTB
-    if 'OTB' in benchmark_name or 'GOT10K' in benchmark_name or 'LASOT' in benchmark_name or 'NFS' in benchmark_name or 'UAV' in benchmark_name or 'AVIST' in benchmark_name:
+    if 'OTB' in benchmark_name or 'GOT10K' in benchmark_name or 'LASOT' in benchmark_name or 'NFS' in benchmark_name or 'UAV' in benchmark_name or 'AVIST' in benchmark_name or 'tcolor128' in benchmark_name.lower() or 'DTB70' in benchmark_name or 'trackingnet' in benchmark_name.lower() or 'ITB' in benchmark_name:
         with open(result_path, "w") as fin:
             for x in regions:
                 p_bbox = x.copy()
@@ -97,11 +95,77 @@ def track_tune(tracker, video, dataset_name, penalty_k, window_influence, lr):
                     p_bbox = x.copy()
                     fin.write(','.join([str(i) for i in p_bbox]) + '\n')
 
-    if 'OTB' in benchmark_name or 'VOT' in benchmark_name or 'GOT10K' in benchmark_name or 'LASOT' in benchmark_name or 'NFS' in benchmark_name or 'UAV' in benchmark_name  or 'AVIST' in benchmark_name:
+    if 'OTB' in benchmark_name or 'VOT' in benchmark_name or 'GOT10K' in benchmark_name or 'LASOT' in benchmark_name or 'NFS' in benchmark_name or 'UAV' in benchmark_name  or 'AVIST' in benchmark_name or 'tcolor128' in benchmark_name.lower() or 'DTB70' in benchmark_name or 'trackingnet' in benchmark_name.lower() or 'ITB' in benchmark_name:
         return tracker_path
     else:
         print('benchmark not supported now 2')
 
+
+def auc_itb(tracker, dataset_name, data_path, penalty_k, window_influence, lr, base_path, json_path=None):
+    """
+    get AUC for ITB benchmark
+    """
+    dataset = load_dataset(dataset_name, base_path=base_path, json_path=json_path)
+    video_keys = list(dataset.keys()).copy()
+    random.shuffle(video_keys)
+
+    for video in video_keys: #tqdm(video_keys, ncols=100):
+        result_path = track_tune(tracker, dataset[video], dataset_name, penalty_k, window_influence, lr)
+
+    auc = eval_itb.eval_itb_tune(result_path, json_path)
+
+    os.rename(result_path, result_path+'_AUC_'+str(auc))
+    return auc
+
+def auc_trackingnet(tracker, dataset_name, data_path, penalty_k, window_influence, lr, base_path, json_path=None):
+    """
+    get AUC for trackingnet benchmark
+    """
+    dataset = load_dataset(dataset_name, base_path=base_path, json_path=json_path)
+    video_keys = list(dataset.keys()).copy()
+    random.shuffle(video_keys)
+
+    for video in video_keys: #tqdm(video_keys, ncols=100):
+        result_path = track_tune(tracker, dataset[video], dataset_name, penalty_k, window_influence, lr)
+
+    auc = eval_trackingnet.eval_trackingnet_tune(result_path, json_path)
+
+    os.rename(result_path, result_path+'_AUC_'+str(auc))
+    return auc
+
+def auc_dtb70(tracker, dataset_name, data_path, penalty_k, window_influence, lr, base_path, json_path=None):
+    """
+    get AUC for DTB70 benchmark
+    """
+    dataset = load_dataset(dataset_name, base_path=base_path, json_path=json_path)
+    video_keys = list(dataset.keys()).copy()
+    random.shuffle(video_keys)
+
+    for video in video_keys: #tqdm(video_keys, ncols=100):
+        result_path = track_tune(tracker, dataset[video], dataset_name, penalty_k, window_influence, lr)
+
+    auc = eval_dtb70.eval_dtb70_tune(result_path, json_path)
+
+    os.rename(result_path, result_path+'_AUC_'+str(auc))
+    return auc
+
+def auc_tcolor128(tracker, dataset_name, data_path, penalty_k, window_influence, lr, base_path, json_path=None):
+    """
+    get AUC for TCOLOR128 benchmark
+    """
+    dataset = load_dataset(dataset_name, base_path=base_path, json_path=json_path)
+    video_keys = list(dataset.keys()).copy()
+    random.shuffle(video_keys)
+
+    for video in video_keys: #tqdm(video_keys, ncols=100):
+        result_path = track_tune(tracker, dataset[video], dataset_name, penalty_k, window_influence, lr)
+
+    auc = eval_tcolor128.eval_tcolor128_tune(result_path, json_path)
+
+    os.rename(result_path, result_path+'_AUC_'+str(auc))
+    return auc
+
+    
 
 def auc_avist(tracker, dataset_name, data_path, penalty_k, window_influence, lr, base_path, json_path=None):
     """

@@ -9,7 +9,7 @@ sizes:
   search_context: ${tracker.search_context}
   search_bbox_ratio: ${tracker.bbox_ratio}
   template_bbox_offset: ${tracker.template_bbox_offset}
-  search_image_shift: 96
+  search_image_shift: 48
   search_image_scale: 0.35
   template_image_shift: 8
   template_image_scale: 0.05

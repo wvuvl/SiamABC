@@ -11,6 +11,7 @@ img_size: 256
 stride: 2
 conv_block: sep_conv
 towernum: 2
+model_size: L
 
 max_layer: 4
 crop_template_features: False

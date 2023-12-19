@@ -71,7 +71,7 @@ class ResNet(nn.Module):
                                                dilate=replace_stride_with_dilation[1])
                 if self.last_layer != 'layer3':
                     self.layer4 = self._make_layer(block, 512, layers[3], stride=2,
-                                                   dilate=replace_stride_with_dilation[2])
+                                                   dilate=2)
                     if self.last_layer != 'layer4':
                         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
                         self.fc = nn.Linear(512 * block.expansion, num_classes)
@@ -284,3 +284,18 @@ def wide_resnet101_2(pretrained=False, progress=True, **kwargs):
     kwargs['width_per_group'] = 64 * 2
     return _resnet('wide_resnet101_2', Bottleneck, [3, 4, 23, 3],
                    pretrained, progress, **kwargs)
+
+
+if __name__ == '__main__':
+    net = resnet50(last_layer = 'layer4')
+    print(net)
+    net = net.cuda()
+
+    var = torch.FloatTensor(1,3,128,128).cuda()
+
+    z = net(var)
+    print('*************')
+    var = torch.FloatTensor(1,3,256,256).cuda()
+
+    net(var)
+

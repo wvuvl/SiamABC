@@ -550,21 +550,30 @@ def load_dataset(dataset, base_path, json_path=None):
                 # ground truth
                 gt_path = join(s_video_path, 'groundtruth.txt')
                 gt = np.loadtxt(gt_path, delimiter=',')
-                gt = gt - [1, 1, 0, 0]
+                gt = gt #- [1, 1, 0, 0]
                 # get img file
                 img_path = join(s_video_path, 'img', '*jpg')
                 image_files = sorted(glob.glob(img_path))
 
                 info[s_video] = {'image_files': image_files, 'gt': gt, 'name': s_video}
                 
-                
-    elif 'NFS' in dataset or 'UAV' in dataset or 'AVIST' in dataset:
+
+    
+    elif 'NFS' in dataset or 'AVIST' in dataset or 'UAV' in dataset or 'tcolor128' in dataset.lower() or 'DTB70' in dataset or 'trackingnet' in dataset.lower():
         info = json.load(open(json_path, 'r'))
+        print(info.keys())
         for v in info.keys():
-            path_name = info[v]['video_dir']
             info[v]['image_files'] = [join(base_path, im_f) for im_f in info[v]['img_names']]
             info[v]['gt'] = np.array(info[v]['gt_rect']) # - [1, 1, 0, 0]
-            info[v]['name'] = path_name
+            info[v]['name'] = v
+            
+    elif 'ITB' in dataset:
+        info = json.load(open(json_path, 'r'))
+        print(info.keys())
+        for v in info.keys():
+            info[v]['image_files'] = [join(base_path, info[v]['video_dir'], im_f) for im_f in info[v]['img_names']]
+            info[v]['gt'] = np.array(info[v]['gt_rect']) # - [1, 1, 0, 0]
+            info[v]['name'] = v
             
             
     elif 'DAVIS' in dataset and 'TEST' not in dataset:
@@ -624,7 +633,7 @@ def load_video_info_im_gt(dataset, video_name, base_path, json_path):
         # ground truth
         gt_path = join(s_video_path, 'groundtruth.txt')
         gt = np.loadtxt(gt_path, delimiter=',')
-        gt = gt - [1, 1, 0, 0]
+        gt = gt #- [1, 1, 0, 0]
         # get img file
         img_path = join(s_video_path, 'img', '*jpg')
         image_files = sorted(glob.glob(img_path))

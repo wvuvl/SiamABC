@@ -1,10 +1,10 @@
 import os
 import pandas as pd
 import numpy as np
-import cv2
+from PIL import Image
 import argparse
 from tqdm import tqdm
-
+import json
 
 def printBB(TrackingNet_dir, frames_folder, BB_file):
 
@@ -32,6 +32,7 @@ def main(output_dir="TrackingNet", save_file="trackingnet.csv", chunks=[]):
     
     sequence_id = 0
     data = []
+    json_dict = {}
     for chunk_folder in chunks:
         chunk_folder = chunk_folder.upper()
 
@@ -44,13 +45,20 @@ def main(output_dir="TrackingNet", save_file="trackingnet.csv", chunks=[]):
             BB_file = os.path.join(output_dir, chunk_folder, "anno", seq_ID + ".txt")
             ArrayBB = printBB(output_dir, frames_folder=frames_folder, BB_file=BB_file)
 
+            
+           
+            image_files = []
+            gt_rect = []
             for i in range(len(ArrayBB)):
 
                 frame_file = str(i)+".jpg"
 
                 imgs_file = os.path.join(frames_folder, frame_file)
-
-                img = cv2.imread(imgs_file)
+                image_files.append(os.path.join(seq_ID, frame_file))
+                
+                img = Image.open(imgs_file)
+                image_width,image_height  = img.size
+        
                 x = int(ArrayBB[i][0])
                 y = int(ArrayBB[i][1])
                 w = int(ArrayBB[i][2])
@@ -58,25 +66,32 @@ def main(output_dir="TrackingNet", save_file="trackingnet.csv", chunks=[]):
                 
                 
                 bbox_exist = int((w > 0) & (h > 0))
-                bbox_border = int(x<=0 or y<=0 or (x+w)>=img.shape[1]-1 or (y+h)>=img.shape[0]-1)
-                
+                bbox_border = int(x<=0 or y<=0 or (x+w)>=image_width-1 or (y+h)>=image_height-1)
                 x = x if x>0 else 0
                 y = y if y>0 else 0
-                w = w if (x+w)< img.shape[1] else img.shape[1]-1
-                h = h if (y+h)< img.shape[0] else img.shape[0]-1
                 
-                data.append([str(sequence_id), seq_ID, i, imgs_file, [x,y,w,h], [img.shape[1], img.shape[0]], 'TrackingNet',bbox_exist, bbox_border])
+                data.append([str(sequence_id), seq_ID, i, imgs_file, [x,y,w,h], [image_width, image_height], 'TrackingNet',bbox_exist, bbox_border])
+                gt_rect.append([x,y,w,h])
+            
+            json_dict[seq_ID] = {}
+            json_dict[seq_ID]['video_dir'] = seq_ID
+            json_dict[seq_ID]['img_names'] = image_files
+            json_dict[seq_ID]['init_rect'] = gt_rect[0]
+            json_dict[seq_ID]['gt_rect'] = gt_rect
+            
             sequence_id+=1
             # sanity save
-            df = pd.DataFrame(data, columns=["sequence_id","track_id","frame_index","img_path","bbox","frame_shape","dataset","presence","near_corner"])
-            df.to_csv(save_file)
+            # df = pd.DataFrame(data, columns=["sequence_id","track_id","frame_index","img_path","bbox","frame_shape","dataset","presence","near_corner"])
+
             
-    df = pd.DataFrame(data, columns=["sequence_id","track_id","frame_index","img_path","bbox","frame_shape","dataset","presence","near_corner"])
-    df.to_csv(save_file)
+    # df = pd.DataFrame(data, columns=["sequence_id","track_id","frame_index","img_path","bbox","frame_shape","dataset","presence","near_corner"])
+    # df.to_csv(save_file)
+    with open(f"TrackingNet_{chunk_folder}.json", "w") as outfile: 
+        json.dump(json_dict, outfile)
 
 
 
-path = '/data/zaveri/SOTA_Tracking_datasets/TrackingNet'
+path = '/new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet'
 
 if __name__ == "__main__": 
     p = argparse.ArgumentParser(description='Download the frames for TrackingNet')

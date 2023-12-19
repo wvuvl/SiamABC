@@ -257,7 +257,7 @@ class ParallelPolarizedSelfCrossAttention(nn.Module):
         
         
         return self_att, cross_att
-    
+
 
 class ParallelPolarizedSelfAttention(nn.Module):
 
@@ -521,9 +521,10 @@ class EncoderResNet(nn.Module):
     def __init__(self, pretrained: bool = True) -> None:
         super().__init__()
         self.pretrained = pretrained
+        self.last_layer_channels = 1024
         self.model = self._load_model()
         self.layers = self._get_layers()
-        self.last_layer_channels = 1024
+        
 
     def _load_model(self) -> Any:
         model = resnet50(pretrained=self.pretrained)
@@ -631,7 +632,67 @@ class AdjustLayer(nn.Module):
         adjust = x_ori
         return adjust
 
- 
+
+
+
+class ChanAttention(nn.Module):
+
+    def __init__(self, in_channels):
+        super().__init__()
+        self.in_channels = in_channels
+
+        self.q = nn.Conv2d(in_channels,
+                                 in_channels,
+                                 kernel_size=1,
+                                 stride=1,
+                                 padding=0)
+        self.k = nn.Conv2d(in_channels,
+                                 in_channels,
+                                 kernel_size=1,
+                                 stride=1,
+                                 padding=0)
+
+        self.v = nn.Conv2d(in_channels,
+                            in_channels,
+                            kernel_size=1,
+                            stride=1,
+                            padding=0)
+        
+        self.proj_out_self = nn.Conv2d(in_channels,
+                                        in_channels,
+                                        kernel_size=1,
+                                        stride=1,
+                                        padding=0)
+    
+    def proc_self_attention(self, v, w_, h):
+        
+        # attend to values
+        w_ = rearrange(w_, 'b i j -> b j i')
+        h_ = torch.einsum('bij,bjk->bik', v, w_)
+        h_ = rearrange(h_, 'b (h w) c -> b c h w', h=h)
+        h_ = self.proj_out_self(h_)
+        return h_
+    
+    def forward(self, x):
+        h_ = x
+        q = self.q(h_)
+        k = self.k(h_)
+        v = self.v(h_)
+        
+        # compute attention
+        b,c,h,w = q.shape
+        q = rearrange(q, 'b c h w -> b c (h w)')
+        k = rearrange(k, 'b c h w -> b (h w) c')
+        v = rearrange(v, 'b c h w -> b (h w) c')
+        
+        w_ = torch.einsum('bij,bjk->bik', q, k)
+        w_ = w_ * (int(c)**(-0.5))
+        
+        h_ = self.proc_self_attention(v, torch.nn.functional.softmax(w_, dim=2), h)
+        
+        return x+h_
+    
+    
 class Attention(nn.Module):
     """
     modified from
@@ -754,9 +815,11 @@ class BoxTower(nn.Module):
         self.cls_encode = EncodeBackbone(in_channels=inchannels, out_channels=outchannels, conv_block=conv_block)
         self.reg_encode = EncodeBackbone(in_channels=inchannels, out_channels=outchannels, conv_block=conv_block)
         
-        self.cls_dw = Correlation2xConcat(num_channels=outchannels, conv_block=conv_block) #, gaussian_map=gaussian_map)
-        self.reg_dw = Correlation2xConcat(num_channels=outchannels, conv_block=conv_block) #, gaussian_map=gaussian_map)
+        self.cls_dw = Correlation2xConcat(num_channels=outchannels, conv_block=conv_block)
+        self.reg_dw = Correlation2xConcat(num_channels=outchannels, conv_block=conv_block)
         
+        # self.cls_dw = CorrelationConcat(num_channels=outchannels, conv_block=conv_block)
+        # self.reg_dw = CorrelationConcat(num_channels=outchannels, conv_block=conv_block)
         
         # box pred head
         for i in range(towernum):
@@ -885,7 +948,7 @@ class Correlation2xConcat(nn.Module):
         
         self.gaussian_map = gaussian_map
         in_size = num_channels + num_corr_channels 
-            
+        # self.att = ParallelPolarizedSelfAttention(in_size)
         self.enc = nn.Sequential(
             ConvBlock(in_size, num_channels, kernel_size=3, padding=1),
             nn.BatchNorm2d(num_channels),
@@ -894,10 +957,11 @@ class Correlation2xConcat(nn.Module):
         
         
     def forward(self, z, x, d):
-        
         b, c, w, h = x.size()
         s1 = torch.matmul(z.permute(0, 2, 1), x.view(b, c, -1)).view(b, -1, w, h)
         s2 = torch.matmul(z.permute(0, 2, 1), d.view(b, c, -1)).view(b, -1, w, h)
         s = torch.cat([s1, s2, d], dim=1) 
+        # s = self.att(s)
         s = self.enc(s)
         return s
+    

@@ -28,6 +28,7 @@ class TrackingState:
         self.frame_h = 0
         self.frame_w = 0
         self.bbox: Optional[np.array] = None
+        self.pred_score = None
         self.mapping: Optional[np.array] = None
         self.prev_size = None
         self.mean_color = None
@@ -43,7 +44,7 @@ class Tracker(ABC):
         
         self.cuda_id = cuda_id
         tracking_config = tracking_config if 'tracking_config' not in tracking_config.keys() else  tracking_config['tracking_config']
-        # print(tracking_config)
+        print(tracking_config)
         self.tracking_config = tracking_config
         self.tracking_state = TrackingState()
         self.net = model
@@ -230,8 +231,18 @@ class AEVTTracker(Tracker):
             bbox(list): [x, y, width, height]
                         x, y need to be 0-based
         """
+        
+        self.smooth_pred = self.tracking_config['smooth']
+        
+        self.N = self.tracking_config["N"]
+        self.dynamic_update = self.tracking_config["dynamic_update"]
+        self.similarity_score = self.tracking_config["similarity_score"]
+        
+        
         rect = clamp_bbox(rect, image.shape)
         self.tracking_state.bbox = rect
+        self.tracking_state.pred_score = 1.0
+        self.prev_good_bbox = rect
         self.tracking_state.paths = deque([], maxlen=70)
         
         self.tracking_state.mean_color = np.mean(image, axis=(0, 1))
@@ -239,9 +250,10 @@ class AEVTTracker(Tracker):
         self._template_features = self.get_template_features(image, rect)
         self.dynamic_template_features = self._template_features.clone()
         self.dynamic_search_features,_,_ = self.get_search_features(image, rect)
-        self.pscores = [1.]# deque([1.], maxlen=200)
-        self.avg_pscores = [1.]
-        self.N = self.tracking_config["N"]
+        # self.pscores = deque([1.], maxlen=self.N)
+        # self.avg_pscores = deque([1.], maxlen=self.N)
+        
+        
         
         self.all_memory_imgs = deque([], maxlen=self.N)
         self.classification_scores= deque([], maxlen=self.N)
@@ -251,10 +263,40 @@ class AEVTTracker(Tracker):
         
         
         self.offset = self.tracking_config["search_context"]
-        self.cls_threshold = 0.5
+        self.cls_threshold = 0.9
         
         self.idx = 0
+        
         self.slection_method = 'mean'
+        
+        self.lost_count = 0
+        self.begin_lost_count = False
+        
+        self.slow_moving_avg = 1.
+        self.fast_moving_avg = 1.
+        
+        # updating hyperparameters
+        self.lambda_slow = 0.99
+        self.lambda_fast = 0.7
+        self.gamma_1 = 0.9
+        self.gamma_2 = 0.5
+    
+    def extend_bbox_manually(self, bbox: np.array, offset: float = 1.1) -> np.array:
+
+        x, y, _, _= bbox
+        _, _, w, h = self.prev_good_bbox
+        
+        if isinstance(offset, tuple):
+            if len(offset) == 4:
+                left, right, top, bottom = offset
+            elif len(offset) == 2:
+                w_offset, h_offset = offset
+                left = right = w_offset
+                top = bottom = h_offset
+        else:
+            left = right = top = bottom = offset
+
+        return np.array([x - w * left, y - h * top, w * (1.0 + right + left), h * (1.0 + top + bottom)]).astype("int32") 
         
     @torch.no_grad()
     def get_template_features(self, image, rect):
@@ -274,6 +316,7 @@ class AEVTTracker(Tracker):
 
     @torch.no_grad()
     def get_search_features(self, image, bbox):
+        
         context = extend_bbox(
             bbox, 
             offset=self.tracking_config["search_context"], 
@@ -296,17 +339,16 @@ class AEVTTracker(Tracker):
         return bbox[0]>=bbox_window[0] and bbox[1]>=bbox_window[1] and bbox[2]<=bbox_window[2] and bbox[3]<=bbox_window[3]
     
     
-    def select_representatives(self):    
-        # indexes = np.argmax(self.classification_scores)
-        # self.dynamic_template_features = self.get_template_features(self.all_memory_imgs[indexes][0], self.all_memory_imgs[indexes][1])
-        # self.dynamic_search_features, _, _ = self.get_search_features(self.all_memory_imgs[indexes][0], self.all_memory_imgs[indexes][1])
-        
+    def process_dynamic_samples(self):
         self.dynamic_template_features = self.get_template_features(self.running_dynamic_image, self.running_dynamic_bbox)
         self.dynamic_search_features, _, _ = self.get_search_features(self.running_dynamic_image, self.running_dynamic_bbox)
-    
-    
-    
-    
+        
+    def select_representatives(self):    
+        indexes = np.argmax(self.classification_scores)
+        # self.dynamic_template_features = self.get_template_features(self.all_memory_imgs[indexes][0], self.all_memory_imgs[indexes][1])
+        self.dynamic_search_features, _, _ = self.get_search_features(self.all_memory_imgs[indexes][0], self.all_memory_imgs[indexes][1])
+        
+        
     def update(self, search: np.ndarray) -> Dict[str, Any]:
         """
         args:
@@ -316,31 +358,31 @@ class AEVTTracker(Tracker):
             clss_score
         """
         
-        
+        # if self.tracking_state.pred_score >= 0.5:
+        #     self.tracking_config['smooth'] == self.smooth_pred
+        # else:
+        #     self.tracking_config['smooth'] == False
+            
         pred_bbox, pred_score, sim_score = self.run_track(search)
-
-        # if pred_score>self.cls_threshold:
-        #     self.all_memory_imgs.append([search, pred_bbox])
-        #     self.classification_scores.append(pred_score)
         
-        # if pred_score >= mean(self.avg_pscores):
-        #     self.running_dynamic_image=search
-        #     self.running_dynamic_bbox=pred_bbox
-            
+        # if pred_score>=self.cls_threshold: 
         self.tracking_state.bbox = pred_bbox
+        self.tracking_state.pred_score = pred_score
         self.tracking_state.paths.append(pred_bbox)
-        
-        # self.pscores.append(pred_score)
-        # self.avg_pscores.append(mean(self.pscores))
-        
-        # self.idx+=1
-        
-        # if  self.idx%self.N==0 and len(self.all_memory_imgs)!=0:
-        #     self.select_representatives()
+    
+        if self.dynamic_update:
+
+            if pred_score>=self.cls_threshold:       
+                self.all_memory_imgs.append([search, pred_bbox])
+                self.classification_scores.append(pred_score)
             
+            self.idx+=1
+            if  self.idx%self.N==0:
+                self.select_representatives()
+            
+
         return pred_bbox, pred_score
 
-    
     def run_track(self, search):
         search_features, search_bbox, search_context = self.get_search_features(search, self.tracking_state.bbox)
         self.tracking_state.mapping = search_context

@@ -44,9 +44,9 @@ def train(gpu, ngpus_per_node, config: Dict[str, Any]) -> None:
     model = instantiate(config["model"])
     print(model)
     train_dataset, val_dataset = get_tracking_datasets(config)
-    # model = load_from_lighting(model, '/new_local_storage/zaveri/code/experiments/2023-10-16-01-38-23_Tracking_SiamABC_no_template_aug_resnet50_full/AEVT/trained_model_ckpt_11.pt')
+    # model = load_from_lighting(model, '/new_local_storage/zaveri/code/experiments/2023-11-01-16-50-56_Tracking_AEVT/AEVT/trained_model_ckpt_1.pt')
     trainer = AEVT_train_val(model=model, config=config, train=train_dataset, val=val_dataset, ngpus_per_node=ngpus_per_node, gpu=gpu)
-    # trainer.optimizer = load_optimizer(trainer.optimizer, '/new_local_storage/zaveri/code/experiments/2023-10-16-01-38-23_Tracking_SiamABC_no_template_aug_resnet50_full/AEVT/trained_model_ckpt_11.pt')
+    # trainer.optimizer = load_optimizer(trainer.optimizer, '/new_local_storage/zaveri/code/experiments/2023-11-01-16-50-56_Tracking_AEVT/AEVT/trained_model_ckpt_1.pt')
     train_loss, val_ios = trainer.train_network()
 
 
@@ -75,7 +75,7 @@ def run_experiment(hydra_config: DictConfig) -> None:
     else:
         # Simply call main_worker function
         train(config["gpus"][0], ngpus_per_node, config)
-            
-
+    
+    
 if __name__ == "__main__":
     run_experiment()

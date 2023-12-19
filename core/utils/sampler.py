@@ -118,68 +118,35 @@ class TrackSampler(ABC):
     def extract_sample(self, idx: int) -> Dict[str, Any]:
         template_item = self.epoch_data.iloc[idx]
         track_indices = self.mapping[template_item["track_id"]]
-                
         search_items = self.data.iloc[track_indices]
+        search_item = (search_items.sample(1).iloc[0])
         
         frame_offset = 10 if template_item["dataset"]=='ytbb' else self.frame_offset
-        
-        # clipping ?
-        dynamic_search_item = (
-                search_items[
-                    (search_items["presence"] == 1)
-                    # & (search_items["frame_index"] > template_item["frame_index"] - frame_offset)
-                    # & (search_items["frame_index"] < template_item["frame_index"] + frame_offset)
-                ]
-                .sample(1)
-                .iloc[0]
-            ) #(search_items[(search_items["presence"] == 1)].sample(1).iloc[0])
-        
-        
-        
-        search_item = (
-            search_items[
-                (search_items["frame_index"] <= dynamic_search_item["frame_index"] + frame_offset) #- self.dynamic_frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
-                # & (search_items["frame_index"] > dynamic_search_item["frame_index"] - frame_offset)
-                & (search_items["frame_index"] >= dynamic_search_item["frame_index"])
-            ]
-            .sample(1)
-            .iloc[0]
-        )
-        
+            
         dynamic_template_item = (
             search_items[
-                (search_items["frame_index"] <= search_item["frame_index"]) # + frame_offset) #- self.frame_offset/4) # if frame_offset == 70, it is only going to search for 35 frames since we also need to account for the previous dynamic frame 
-                & (search_items["frame_index"] >= search_item["frame_index"] - frame_offset)
-                & (search_items["presence"] == 1)
+                (search_items["frame_index"] >= search_item["frame_index"] - frame_offset)
+                # (search_items["frame_index"] <= search_item["frame_index"] + frame_offset) 
+                # & (search_items["frame_index"] >= search_item["frame_index"] - frame_offset//2)
+                # & (search_items["presence"] == 1)
             ]
             .sample(1)
             .iloc[0]
         )
         
-        prev_dynamic_search_item = (
+        dynamic_search_item = (
             search_items[
-                (search_items["frame_index"] > dynamic_search_item["frame_index"] - 3) #- self.frame_offset/4)
-                & (search_items["frame_index"] <= dynamic_search_item["frame_index"])
-                & (search_items["presence"] == 1)
+                (search_items["frame_index"] >= search_item["frame_index"] - frame_offset)
+                # (search_items["frame_index"] <= search_item["frame_index"] + frame_offset) 
+                # & (search_items["frame_index"] >= search_item["frame_index"] - frame_offset//2)
+                # & (search_items["presence"] == 1)
             ]
             .sample(1)
             .iloc[0]
         )
-
-
-
-        # # mining negative samples for the classification loss robustness
-        # if np.random.rand() < self.negative_sample_probability_threshold:
-        #     search_items = (search_items[(search_items["presence"] == 0)])
-        #     if len(search_items)==0:
-        #         search_items = self.data[self.data["track_id"]!=template_item["track_id"]]
-        #         search_item = (search_items.sample(1).iloc[0])
-        #         search_item["presence"] = 0
-        #     else:
-        #         search_item=(search_items.sample(1).iloc[0])
-            
-            
-        return dict(template=template_item, dynamic_template=dynamic_template_item, search=search_item, dynamic_search=dynamic_search_item, prev_dynamic_search=prev_dynamic_search_item)
+        
+        return dict(template=template_item, dynamic_template=dynamic_template_item, search=search_item, dynamic_search=dynamic_search_item, prev_dynamic_search=dynamic_template_item)   
+        # return dict(template=template_item, dynamic_template=dynamic_template_item, search=search_item, dynamic_search=dynamic_search_item, prev_dynamic_search=prev_dynamic_search_item)
 
 if __name__ == '__main__':
     import time

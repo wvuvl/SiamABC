@@ -54,7 +54,7 @@ def compute_success_error(gt_center, result_center):
 
 def get_result_bb(arch, seq):
     result_path = join(arch, seq + '.txt')
-    temp = np.loadtxt(result_path, delimiter=',').astype(np.float)
+    temp = np.loadtxt(result_path, delimiter=',').astype("float")
     return np.array(temp)
 
 
@@ -79,7 +79,7 @@ def eval_auc(dataset='LASOTTEST', result_path='./test/', tracker_reg='S*', start
     # success_error = np.zeros((n_seq, len(trackers), len(thresholds_error)))
     for i in range(n_seq):
         seq = seqs[i]
-        gt_rect = np.array(annos[seq]['gt_rect']).astype(np.float)
+        gt_rect = np.array(annos[seq]['gt_rect']).astype("float")
         gt_center = convert_bb_to_center(gt_rect)
         for j in range(len(trackers)):
             tracker = trackers[j]
@@ -113,14 +113,14 @@ def eval_lasot_tune(result_path, json_path):
 
     for i in range(n_seq):
         seq = seqs[i]
-        gt_rect = np.array(annos[seq]['gt_rect']).astype(np.float)
+        gt_rect = np.array(annos[seq]['gt_rect']).astype("float")
         gt_center = convert_bb_to_center(gt_rect)
         bb = get_result_bb(result_path, seq)
         center = convert_bb_to_center(bb)
         success_overlap[i][0] = compute_success_overlap(gt_rect, bb)
 
     auc = success_overlap[:, 0, :].mean()
-    return auc
+    return auc, center.mean()
 
 
 if __name__ == "__main__":
@@ -135,6 +135,6 @@ if __name__ == "__main__":
     # eval_auc(dataset, result_path, tracker_reg, start, end)
     # # eval_auc('LASOTTEST', './result', 'DSiam', 0, 1)
     
-    result_path = '/new_local_storage/zaveri/code/experiments/2023-10-18-00-35-15_Tracking_SiamABC_dynamic_updates_TTA_style_every_150_resnet/AEVT/results/AEVTTracker'
-    json_path = '/new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT/LASOTTEST.json'
+    result_path = '/home/ramzav/ray_results/fitness_2023-11-12_01-50-30/fitness_d218e85a_263_lr=0.5630,penalty_k=0.0810,window_influence=0.1690_2023-11-15_03-01-34/SiamABC/LASOT_penalty_k_0_0810_w_influence_0_1690_lr_0_5630_AUC_0.5746879050854271'
+    json_path = '/luna_data/zaveri/SOTA_Tracking_datasets/LaSOT/LASOTTEST.json'
     print(eval_lasot_tune(result_path, json_path))

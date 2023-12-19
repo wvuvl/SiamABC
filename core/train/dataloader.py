@@ -32,7 +32,11 @@ class TrackingNet(object):
         super(TrackingNet, self).__init__()
         self.root_dir = root_dir
         self.chunk_folder = chunk_folder
-        self.list_sequences = np.random.choice(os.listdir(os.path.join(root_dir, chunk_folder, "frames")), size=choose)
+        
+        dir_list = os.listdir(os.path.join(root_dir, chunk_folder, "frames"))
+        
+        if choose==-1: choose=len(dir_list)
+        self.list_sequences = np.random.choice(dir_list, size=choose)
     
     def __getitem__(self, index):
         

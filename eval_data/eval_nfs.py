@@ -54,7 +54,7 @@ def compute_success_error(gt_center, result_center):
 
 def get_result_bb(arch, seq):
     result_path = join(arch, seq + '.txt')
-    temp = np.loadtxt(result_path, delimiter=',').astype(np.float)
+    temp = np.loadtxt(result_path, delimiter=',').astype("float")
     return np.array(temp)
 
 
@@ -63,6 +63,32 @@ def convert_bb_to_center(bboxes):
                      (bboxes[:, 1] + (bboxes[:, 3] - 1) / 2)]).T
 
 
+def eval_nfs(result_path, json_path):
+    list_path = json_path
+    annos = json.load(open(list_path, 'r'))
+    seqs = list(annos.keys())  # dict to list for py3
+    n_seq = len(seqs)
+    thresholds_overlap = np.arange(0, 1.05, 0.05)
+    success_overlap = np.zeros((n_seq, 1, len(thresholds_overlap)))
+    thr_ce = np.arange(0, 51)
+    prec_overlap = np.zeros((n_seq, 1, len(thr_ce)))
+
+    for i in range(n_seq):
+        seq = seqs[i]
+        gt_rect = np.array(annos[seq]['gt_rect']).astype("float")
+        gt_center = convert_bb_to_center(gt_rect)
+        bb = get_result_bb(result_path, seq)
+        center = convert_bb_to_center(bb)
+        
+        min_num = min(len(gt_rect), len(bb))
+        success_overlap[i][0] = compute_success_overlap(gt_rect[:min_num], bb[:min_num])
+        prec_overlap[i][0] = compute_success_error(gt_center[:min_num], center[:min_num])
+    auc = success_overlap[:, 0, :].mean()
+    prec = prec_overlap[:, 0, 20].mean()
+    succ_rate = success_overlap[:, 0, 10].mean()
+    
+    return auc, prec, succ_rate
+
 def eval_nfs_tune(result_path, json_path):
     list_path = json_path
     annos = json.load(open(list_path, 'r'))
@@ -70,21 +96,28 @@ def eval_nfs_tune(result_path, json_path):
     n_seq = len(seqs)
     thresholds_overlap = np.arange(0, 1.05, 0.05)
     success_overlap = np.zeros((n_seq, 1, len(thresholds_overlap)))
+    thr_ce = np.arange(0, 51)
+    prec_overlap = np.zeros((n_seq, 1, len(thr_ce)))
 
     for i in range(n_seq):
         seq = seqs[i]
-        gt_rect = np.array(annos[seq]['gt_rect']).astype(np.float)
+        gt_rect = np.array(annos[seq]['gt_rect']).astype("float")
         gt_center = convert_bb_to_center(gt_rect)
         bb = get_result_bb(result_path, seq)
         center = convert_bb_to_center(bb)
-        success_overlap[i][0] = compute_success_overlap(gt_rect, bb)
-
+        
+        min_num = min(len(gt_rect), len(bb))
+        success_overlap[i][0] = compute_success_overlap(gt_rect[:min_num], bb[:min_num])
+        prec_overlap[i][0] = compute_success_error(gt_center[:min_num], center[:min_num])
     auc = success_overlap[:, 0, :].mean()
+    prec = prec_overlap[:, 0, 20].mean()
+    succ_rate = success_overlap[:, 0, 10].mean()
+    
     return auc
 
 
 if __name__ == "__main__":
     
-    result_path = '/new_local_storage/zaveri/code/experiments/2023-10-18-00-35-15_Tracking_SiamABC_dynamic_updates_TTA_style_every_150_resnet/AEVT/results/AEVTTracker'
-    json_path = '/new_local_storage/zaveri/SOTA_Tracking_datasets/nfs/nfs/nfsTEST.json'
-    print(eval_nfs_tune(result_path, json_path))
+    result_path = '/home/ramzav/ray_results/fitness_2023-11-19_23-31-04/fitness_7c6b8fb5_108_lr=0.6700,penalty_k=0.0550,window_influence=0.4480_2023-11-20_10-22-45/SiamABC/NFS240_penalty_k_0_0550_w_influence_0_4480_lr_0_6700_AUC_0.6641110557116641'
+    json_path = '/luna_data/zaveri/SOTA_Tracking_datasets/NFS/NFS240.json'
+    print(eval_nfs(result_path, json_path))

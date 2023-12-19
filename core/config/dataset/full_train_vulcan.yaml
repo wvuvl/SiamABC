@@ -1,0 +1,315 @@
+# @package _global_
+
+sizes:
+  search_image_size: ${tracker.instance_size}
+  template_image_size: ${tracker.template_size}
+  search_context: ${tracker.search_context}
+  search_bbox_ratio: ${tracker.bbox_ratio}
+  template_bbox_offset: ${tracker.template_bbox_offset}
+  search_image_shift: 48
+  search_image_scale: 0.35
+  template_image_shift: 8
+  template_image_scale: 0.05
+  upscale_factor: 2
+  context_range: 3
+
+frame_offset: 70
+negative_ratio: 0
+# clip_range: True
+
+dynamic_frame_offset:
+  start_epoch: 20
+  freq: 5
+  step: 5
+  max_value: 30
+
+train:
+  datasets:
+    
+    # GOT10k
+    - dataset_type: ${dataset_type}
+      root: /luna_data/zaveri/SOTA_Tracking_datasets/GOT10k/GOT10k
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /luna_data/zaveri/code/SiamABC_colossal/core/dataset_utils/got10k_vot_excluded.csv #/luna_data/zaveri/code/data/filtered_csvs/filtered_got10k.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 300000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
+    
+    # # LaSOT
+    - dataset_type: ${dataset_type}
+      root: /luna_data/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /luna_data/zaveri/code/SiamABC_colossal/core/dataset_utils/lasot.csv #/luna_data/zaveri/code/data/filtered_csvs/filtered_lasot.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 100000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
+
+    
+    # COCO2017
+    - dataset_type: ${dataset_type}
+      root: /luna_data/zaveri/SOTA_Tracking_datasets/coco2017
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /luna_data/zaveri/code/SiamABC_colossal/core/dataset_utils/coco2017.csv #/luna_data/zaveri/code/data/filtered_csvs/filtered_coco.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 200000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
+
+    # ImageNet2014
+    - dataset_type: ${dataset_type}
+      root: /luna_data/zaveri/SOTA_Tracking_datasets/ILSVRC2014_DET_train
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /luna_data/zaveri/code/SiamABC_colossal/core/dataset_utils/imagenet2014.csv #/luna_data/zaveri/code/data/filtered_csvs/filtered_imagenet.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 200000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
+    
+    # ytbb
+    - dataset_type: ${dataset_type}
+      root: /luna_data/zaveri/SOTA_Tracking_datasets/ILSVRC2014_DET_train
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /luna_data/zaveri/code/SiamABC_colossal/core/dataset_utils/ytbb_train.csv #/luna_data/zaveri/code/data/filtered_csvs/filtered_ytbb.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 400000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
+
+    # # # TrackingNet Parts
+    # # TRAIN_0
+    # - dataset_type: ${dataset_type}
+    #   root: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   sampling:
+    #     _target_: core.utils.sampler.TrackSampler
+    #     data_path: /luna_data/zaveri/code/SiamABC_colossal/core/dataset_utils/trackingnet_0.csv
+    #     negative_ratio: ${negative_ratio}
+    #     frame_offset: ${frame_offset}
+    #     num_samples: 200000 # 100000
+    #   transform: photometric
+    #   regression_weight_label_size: ${tracker.score_size}
+    #   sizes: ${sizes}
+    #   stride: ${model.stride}
+
+    # # TRAIN_1
+    # - dataset_type: ${dataset_type}
+    #   root: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   sampling:
+    #     _target_: core.utils.sampler.TrackSampler
+    #     data_path: /luna_data/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_1.csv
+    #     negative_ratio: ${negative_ratio}
+    #     frame_offset: ${frame_offset}
+    #     num_samples: 50000 # 100000
+    #   transform: photometric
+    #   regression_weight_label_size: ${tracker.score_size}
+    #   sizes: ${sizes}
+    #   stride: ${model.stride}
+    
+    # # TRAIN_2
+    # - dataset_type: ${dataset_type}
+    #   root: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   sampling:
+    #     _target_: core.utils.sampler.TrackSampler
+    #     data_path: /luna_data/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_2.csv
+    #     negative_ratio: ${negative_ratio}
+    #     frame_offset: ${frame_offset}
+    #     num_samples: 50000 # 100000
+    #   transform: photometric
+    #   regression_weight_label_size: ${tracker.score_size}
+    #   sizes: ${sizes}
+    #   stride: ${model.stride}
+    
+    # # TRAIN_3
+    # - dataset_type: ${dataset_type}
+    #   root: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   sampling:
+    #     _target_: core.utils.sampler.TrackSampler
+    #     data_path: /luna_data/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_3.csv
+    #     negative_ratio: ${negative_ratio}
+    #     frame_offset: ${frame_offset}
+    #     num_samples: 50000 # 100000
+    #   transform: photometric
+    #   regression_weight_label_size: ${tracker.score_size}
+    #   sizes: ${sizes}
+    #   stride: ${model.stride}
+    
+    # # TRAIN_4
+    # - dataset_type: ${dataset_type}
+    #   root: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   sampling:
+    #     _target_: core.utils.sampler.TrackSampler
+    #     data_path: /luna_data/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_4.csv
+    #     negative_ratio: ${negative_ratio}
+    #     frame_offset: ${frame_offset}
+    #     num_samples: 50000 # 100000
+    #   transform: photometric
+    #   regression_weight_label_size: ${tracker.score_size}
+    #   sizes: ${sizes}
+    #   stride: ${model.stride}
+
+    # # TRAIN_5
+    # - dataset_type: ${dataset_type}
+    #   root: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   sampling:
+    #     _target_: core.utils.sampler.TrackSampler
+    #     data_path: /luna_data/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_5.csv
+    #     negative_ratio: ${negative_ratio}
+    #     frame_offset: ${frame_offset}
+    #     num_samples: 50000 # 100000
+    #   transform: photometric
+    #   regression_weight_label_size: ${tracker.score_size}
+    #   sizes: ${sizes}
+    #   stride: ${model.stride}
+
+    # # TRAIN_6
+    # - dataset_type: ${dataset_type}
+    #   root: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   sampling:
+    #     _target_: core.utils.sampler.TrackSampler
+    #     data_path: /luna_data/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_6.csv
+    #     negative_ratio: ${negative_ratio}
+    #     frame_offset: ${frame_offset}
+    #     num_samples: 50000 # 100000
+    #   transform: photometric
+    #   regression_weight_label_size: ${tracker.score_size}
+    #   sizes: ${sizes}
+    #   stride: ${model.stride}
+
+    # # TRAIN_7
+    # - dataset_type: ${dataset_type}
+    #   root: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   sampling:
+    #     _target_: core.utils.sampler.TrackSampler
+    #     data_path: /luna_data/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_7.csv
+    #     negative_ratio: ${negative_ratio}
+    #     frame_offset: ${frame_offset}
+    #     num_samples: 50000 # 100000
+    #   transform: photometric
+    #   regression_weight_label_size: ${tracker.score_size}
+    #   sizes: ${sizes}
+    #   stride: ${model.stride}
+
+    # # TRAIN_8
+    # - dataset_type: ${dataset_type}
+    #   root: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   sampling:
+    #     _target_: core.utils.sampler.TrackSampler
+    #     data_path: /luna_data/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_8.csv
+    #     negative_ratio: ${negative_ratio}
+    #     frame_offset: ${frame_offset}
+    #     num_samples: 50000 # 100000
+    #   transform: photometric
+    #   regression_weight_label_size: ${tracker.score_size}
+    #   sizes: ${sizes}
+    #   stride: ${model.stride}
+
+    # # TRAIN_9
+    # - dataset_type: ${dataset_type}
+    #   root: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   sampling:
+    #     _target_: core.utils.sampler.TrackSampler
+    #     data_path: /luna_data/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_9.csv
+    #     negative_ratio: ${negative_ratio}
+    #     frame_offset: ${frame_offset}
+    #     num_samples: 50000 # 100000
+    #   transform: photometric
+    #   regression_weight_label_size: ${tracker.score_size}
+    #   sizes: ${sizes}
+    #   stride: ${model.stride}
+
+    # # TRAIN_10
+    # - dataset_type: ${dataset_type}
+    #   root: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   sampling:
+    #     _target_: core.utils.sampler.TrackSampler
+    #     data_path: /luna_data/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_10.csv
+    #     negative_ratio: ${negative_ratio}
+    #     frame_offset: ${frame_offset}
+    #     num_samples: 50000 # 100000
+    #   transform: photometric
+    #   regression_weight_label_size: ${tracker.score_size}
+    #   sizes: ${sizes}
+    #   stride: ${model.stride}
+
+    # # TRAIN_11
+    # - dataset_type: ${dataset_type}
+    #   root: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   sampling:
+    #     _target_: core.utils.sampler.TrackSampler
+    #     data_path: /luna_data/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_11.csv
+    #     negative_ratio: ${negative_ratio}
+    #     frame_offset: ${frame_offset}
+    #     num_samples: 50000 # 100000
+    #   transform: photometric
+    #   regression_weight_label_size: ${tracker.score_size}
+    #   sizes: ${sizes}
+    #   stride: ${model.stride}
+
+
+val:
+  img_size: 256
+  ann_path:
+  datasets:
+    - name: got10k
+      root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/GOT10k/GOT10k
+      subset: val
+    - name: nfs
+      root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/NFS/NFS/NFS
+    - name: vot
+      root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/vot2018
+      version: 2018
+    - name: lasot
+      root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT
+      file_path: /luna_data/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT/testing_set.txt
+      choose: 50
+    - name: trackingnet
+      root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+      chunk_folder: TRAIN_11
+      choose: 50
+test:
+  img_size: 256
+  ann_path:
+  datasets:
+#     - name: vot
+#       root_dir: ${visual_object_tracking_datasets}/vot2018
+#       version: 2018
+    # - name: got10k
+    #   root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/GOT10k/GOT10k
+    #   subset: test
+    # - name: got10k
+    #   root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/GOT10k/GOT10k
+    #   subset: val
+    # - name: vot
+    #   root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/vot2018
+    #   version: 2018
+    # - name: nfs
+    #   root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/NFS/NFS/NFS
+    #   fps: 240
+    - name: lasot
+      root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT
+      file_path: /luna_data/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT/testing_set.txt
+      choose: 50
+    # - name: trackingnet
+    #   root_dir: /luna_data/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   chunk_folder: TRAIN_11

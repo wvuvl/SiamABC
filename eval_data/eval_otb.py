@@ -101,11 +101,11 @@ def eval_auc(json_path, dataset='OTB2015', result_path='./test/', tracker_reg='S
             tracker = trackers[j]
             print('{:d} processing:{} tracker: {}'.format(i, seq, tracker))
             
-            # if seq == 'human4_2':
-            #     annos[seq]['name'] = 'Human4.2'
+            if seq == 'human4_2':
+                annos[seq]['name'] = 'Human4.2'
                 
-            # if seq == 'human4_1':
-            #     annos[seq]['name'] = 'Human4.1'
+            if seq == 'human4_1':
+                annos[seq]['name'] = 'Human4.1'
                 
             bb = get_result_bb(tracker, seq)
             center = convert_bb_to_center(bb)

@@ -6,7 +6,7 @@ hydra:
 
 defaults:
   - backend: gpus
-  - dataset: got10k_train
+  - dataset: full_train
   - model: AEVT
   - loss: AEVT_loss
   - optimizer: adam
