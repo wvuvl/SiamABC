@@ -12,13 +12,6 @@ from typing import Dict, Tuple, Any, Tuple, List
 import torch
 import torch.nn as nn
 
-# from blocks import Encoder, AdjustLayer, BoxTower, SpatialSelfCrossAttention
-# TARGET_CLASSIFICATION_KEY = "TARGET_CLASSIFICATION_KEY"
-# TARGET_REGRESSION_LABEL_KEY = "TARGET_REGRESSION_LABEL_KEY"
-# SIMSIAM_SEARCH_OUT_KEY = "SIMSIAM_SEARCH_OUT_KEY"
-# SIMSIAM_DYNAMIC_OUT_KEY = "SIMSIAM_DYNAMIC_OUT_KEY"
-
-
 from core.models.blocks import Encoder, EncoderRegNet, AdjustLayer, BoxTower, SpatialSelfCrossAttention, Correlation, EncoderResNet
 from core.models.resnet import resnet50
 import core.constants as constants
