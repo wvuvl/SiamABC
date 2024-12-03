@@ -32,7 +32,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/old_AEVT_copy/core/dataset_utils/lasot.csv #/new_local_storage/zaveri/code/data/filtered_csvs/filtered_lasot.csv
+        data_path: /new_local_storage/zaveri/code/old_SiamABC_copy/core/dataset_utils/lasot.csv #/new_local_storage/zaveri/code/data/filtered_csvs/filtered_lasot.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 100000 # 100000

@@ -1,5 +1,5 @@
 import argparse
-from AEVT_tracker import AEVTTracker
+from SiamABC_tracker import SiamABCTracker
 from core.utils.torch_stuff import load_from_lighting
 from eval_SiamABC import auc_otb, eao_vot, auc_got10k, auc_lasot, auc_nfs, auc_uav123, auc_avist, auc_tcolor128, auc_dtb70, auc_trackingnet, auc_itb
 import os
@@ -12,19 +12,21 @@ from ray.tune.search.hyperopt import HyperOptSearch
 from ray.train import RunConfig
 from ray.tune import CLIReporter
 
-from core.models.AEVT import AEVTNet
+from core.models.SiamABC import SiamABCNet
+from core.models.custom_bn import replace_layers
 
 parser = argparse.ArgumentParser(description='parameters for SiamABC tracker')
 parser.add_argument('--config_path', default='core/config', type=str, help='config path')
-parser.add_argument('--config_name', default='AEVT_tracker', type=str, help='config name')
+parser.add_argument('--config_name', default='SiamABC_tracker', type=str, help='config name')
 parser.add_argument('--model_size', default='S', type=str, help='model prefrence')
-parser.add_argument('--weights_path', default='/new_local_storage/zaveri/code/experiments/2023-10-21-22-40-46_Tracking_SiamABC_regnetX_full/AEVT/trained_model_ckpt_9.pt', type=str, help='weights path')
+parser.add_argument('--weights_path', default='/new_local_storage/zaveri/code/experiments/2023-10-21-22-40-46_Tracking_SiamABC_regnetX_full/SiamABC/trained_model_ckpt_9.pt', type=str, help='weights path')
 parser.add_argument('--cache_dir', default='./TPE_results', type=str, help='directory to store cache')
 parser.add_argument('--gpu_nums', default=1, type=int, help='gpu numbers')
 parser.add_argument('--trial_per_gpu', default=8, type=int, help='trail per gpu')
 parser.add_argument('--align', default='True', type=str, help='align')
 parser.add_argument('--num_trials', default='1', type=int)
-parser.add_argument('--dynamic_update', action='store_true', default='False')
+parser.add_argument('--dynamic_update', action='store_true', default=False)
+parser.add_argument('--tta', action='store_true', default=False)
 
 # data specific
 parser.add_argument('--base_path', type=str, help='base path', default='/new_local_storage/zaveri/code/SiamABC/vot2018/VOT2018')
@@ -39,25 +41,39 @@ params["penalty_k"] = 0.001 #hp.quniform('penalty_k', 0.001, 0.2, 0.001)
 params['lr']= 0.3 #hp.quniform('scale_lr', 0.3, 0.8, 0.001)
 params['window_influence']= 0.15 #hp.quniform('window_influence', 0.15, 0.65, 0.001)
 params["config_path"] = args.config_path #"core/config"
-params ["config_name"] = args.config_name #"AEVT_tracker"
-params["weights_path"] = args.weights_path #"/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/models/small/trained_model_ckpt_20.pt"
+params ["config_name"] = args.config_name #"SiamABC_tracker"
+params["weights_path"] = args.weights_path #"/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/SiamABC/models/small/trained_model_ckpt_20.pt"
 
 params["base_path"] = args.base_path
 params["json_file"] = args.json_file
+params["tta"] = args.tta
 print('tuning range: ')
 pprint(params)    
     
 
 
-def get_tracker(config_path, config_name, weights_path, penalty_k, window_influence, lr) -> AEVTTracker:
+def get_tracker(config_path, config_name, weights_path, penalty_k, window_influence, lr, norm_lambda=None) -> SiamABCTracker:
     with open(os.path.join(args.config_path,'tracker/siam_tracker.yaml'), 'r') as file:
         config = yaml.safe_load(file)
     config["penalty_k"] = penalty_k
     config["window_influence"] = window_influence
     config["lr"] = lr
-    model = AEVTNet(model_size=args.model_size)
+    config["smooth"]=True
+    model = SiamABCNet(model_size=args.model_size)
+    
+        
+    if params["tta"]:
+        print("Will update batchnorm every frame")
+        
+        replace_layers(model.connect_model.cls_dw, norm_lambda=norm_lambda, contineous=False)
+        replace_layers(model.connect_model.reg_dw, norm_lambda=norm_lambda, contineous=False)
+        
+        replace_layers(model.connect_model.bbox_tower, norm_lambda=norm_lambda, contineous=False)
+        replace_layers(model.connect_model.cls_tower, norm_lambda=norm_lambda, contineous=False)
+        print(model)
+        
     model = load_from_lighting(model, weights_path).cuda().eval()
-    tracker = AEVTTracker(model=model, tracking_config=config)
+    tracker = SiamABCTracker(model=model, tracking_config=config)
     return tracker
 
 
@@ -66,8 +82,8 @@ main_dict = {}
 def fitness(config):    
     
     config_path = params["config_path"] #"core/config"
-    config_name = params ["config_name"] #"AEVT_tracker"
-    weights_path = params["weights_path"] #"/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/AEVT/models/small/trained_model_ckpt_20.pt"
+    config_name = params ["config_name"] #"SiamABC_tracker"
+    weights_path = params["weights_path"] #"/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/SiamABC/models/small/trained_model_ckpt_20.pt"
     
     base_path = params["base_path"]
     json_file = params["json_file"]
@@ -76,8 +92,13 @@ def fitness(config):
     lr = config["lr"]
     window_influence = config["window_influence"]
     
-    tracker = get_tracker(config_path=config_path, config_name=config_name, weights_path=weights_path, penalty_k=penalty_k, window_influence=window_influence, lr=lr)
+    if not params["tta"]:
+        tracker = get_tracker(config_path=config_path, config_name=config_name, weights_path=weights_path, penalty_k=penalty_k, window_influence=window_influence, lr=lr)
     
+    else:
+        norm_lambda = config["lambda"]
+        tracker = get_tracker(config_path=config_path, config_name=config_name, weights_path=weights_path, penalty_k=penalty_k, window_influence=window_influence, lr=lr, norm_lambda=norm_lambda)
+        
     print(args.dataset)
      
     
@@ -176,10 +197,19 @@ def main():
     #     break
     
     # ray.init(num_gpus=args.gpu_nums, num_cpus=args.gpu_nums * 8,  object_store_memory=500000000)
-    config = {
+    if not params["tta"]:
+        config = {
+                "penalty_k": tune.quniform( 0.001, 0.2, 0.001),
+                "lr": tune.quniform(0.3, 0.95, 0.001),
+                "window_influence": tune.quniform( 0.15, 0.65, 0.001),
+                # "N": tune.choice([35, 75, 90, 150])
+            }
+    else:
+        config = {
             "penalty_k": tune.quniform( 0.001, 0.2, 0.001),
             "lr": tune.quniform(0.3, 0.8, 0.001),
             "window_influence": tune.quniform( 0.15, 0.65, 0.001),
+            "lambda": tune.choice([0.2, 0.1, 0.05, 0.01, 0.005, 0.001, 0.0005, 0.0001, 0.])
             # "N": tune.choice([35, 75, 90, 150])
         }
     
@@ -218,10 +248,9 @@ def main():
         run_config=RunConfig(progress_reporter=reporter)
     )
     
-    # /home/ramzav/ray_results/fitness_2023-11-06_23-15-08 for SiamABC_M_got10k
-    # # /home/ramzav/ray_results/fitness_2023-11-06_03-54-42 for SiamABC_XL_avist
-    # /home/ramzav/ray_results/fitness_2023-11-08_01-03-22 for SiamABC_XL_uav123
-    # tuner = tune.Tuner.restore('/home/ramzav/ray_results/fitness_2023-11-06_23-06-27', 
+    # # /home/ramzav/ray_results/fitness_2024-02-23_16-40-56 #lasot SiamABC S mixed pol neck and crr vulcan
+    # # /home/ramzav/ray_results/fitness_2024-02-26_03-41-30 #nfs SiamABC M mixed pol neck and crr vulcan
+    # tuner = tune.Tuner.restore('/home/ramzav/ray_results/fitness_2024-02-26_03-41-30', 
     #                            trainable=tune.with_resources(
     #                                 tune.with_parameters(fitness),
     #                                 resources={"cpu": 1, "gpu": 1/args.trial_per_gpu},
@@ -242,9 +271,11 @@ def main():
     AUC = best_result.metrics["AUC"]
     
     df = results.get_dataframe()
-    df.to_csv(f"{args.dataset}_SiamABC_{args.model_size}_k_{penalty_k}_lr_{lr}_wi_{window_influence}_AUC_{AUC}_runs.csv")
-    
-    
+    if not params["tta"]:
+        df.to_csv(f"{args.dataset}_SiamABC_{args.model_size}_k_{penalty_k}_lr_{lr}_wi_{window_influence}_AUC_{AUC}_runs.csv")
+    else:
+        norm_lambda = best_result.config["lambda"]
+        df.to_csv(f"{args.dataset}_SiamABC_{args.model_size}_k_{penalty_k}_lr_{lr}_wi_{window_influence}_lambda_{norm_lambda}_AUC_{AUC}_runs.csv")
     
 if __name__ == "__main__":
     main()

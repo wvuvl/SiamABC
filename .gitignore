@@ -1,15 +1,1 @@
-src
-.vscode
-__pycache__
-experiments
 *.csv
-*experiment*
-*.log
-models
-.hydra
-*.mp4
-hardcopy.0
-test.txt
-airplane_in_rain.txt
-air_show.txt
-build

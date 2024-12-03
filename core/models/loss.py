@@ -6,6 +6,30 @@ import torch.nn as nn
 import core.constants as constants
 
 
+# def calc_giou(reg_target: torch.Tensor, pred: torch.Tensor, smooth: float = 1e-7) -> torch.Tensor:
+    
+    
+    
+#     target_area = (reg_target[..., 0] + reg_target[..., 2]) * (reg_target[..., 1] + reg_target[..., 3])
+#     pred_area = (pred[..., 0] + pred[..., 2]) * (pred[..., 1] + pred[..., 3])
+
+#     w_intersect = torch.min(pred[..., 0], reg_target[..., 0]) + torch.min(pred[..., 2], reg_target[..., 2])
+#     h_intersect = torch.min(pred[..., 3], reg_target[..., 3]) + torch.min(pred[..., 1], reg_target[..., 1])
+
+#     area_intersect = w_intersect * h_intersect
+#     area_union = target_area + pred_area - area_intersect
+
+#     iou = (area_intersect + smooth) / (area_union + smooth)
+    
+#     w_c = torch.max(pred[..., 0], reg_target[..., 0]) + torch.max(pred[..., 2], reg_target[..., 2])
+#     h_c = torch.max(pred[..., 1], reg_target[..., 1]) + torch.max(pred[..., 3], reg_target[..., 3])
+#     area_c = w_c * h_c + smooth
+    
+#     # Giou
+#     giou = iou - (area_c - area_union) / area_c
+    
+#     return giou
+
 def calc_iou(reg_target: torch.Tensor, pred: torch.Tensor, smooth: float = 1.0) -> torch.Tensor:
     target_area = (reg_target[..., 0] + reg_target[..., 2]) * (reg_target[..., 1] + reg_target[..., 3])
     pred_area = (pred[..., 0] + pred[..., 2]) * (pred[..., 1] + pred[..., 3])
@@ -37,7 +61,10 @@ class BoxLoss(nn.Module):
         else:
             return losses.mean()
 
-class AEVTLoss(nn.Module):
+
+
+
+class SiamABCLoss(nn.Module):
     def __init__(self, coeffs: Dict[str, float]):
         super().__init__()
         self.classification_loss = nn.BCEWithLogitsLoss()
@@ -108,5 +135,5 @@ class AEVTLoss(nn.Module):
             constants.TARGET_REGRESSION_LABEL_KEY: regression_loss * self.coeffs[constants.TARGET_REGRESSION_LABEL_KEY],
             constants.SIMSIAM_SEARCH_OUT_KEY:  cos_sim_loss_search,
             constants.SIMSIAM_DYNAMIC_OUT_KEY: cos_sim_loss_dynamic,
-            constants.SIMSIAM_NEGATIVE_OUT_KEY: cos_dissim_loss_search+cos_dissim_loss_dynamic,
+            constants.SIMSIAM_NEGATIVE_OUT_KEY: cos_dissim_loss_search+cos_dissim_loss_dynamic * 0,
         }

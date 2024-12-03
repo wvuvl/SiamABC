@@ -1,4 +1,4 @@
-_target_: core.models.AEVT.AEVTNet
+_target_: core.models.SiamABC.SiamABCNet
 backbone: custom_fbnet
 growth_factor: 1.2
 upsample: pixel_shuffle
@@ -11,7 +11,6 @@ img_size: 256
 stride: 2
 conv_block: sep_conv
 towernum: 2
-model_size: L
-
+model_size: S
 max_layer: 4
 crop_template_features: False

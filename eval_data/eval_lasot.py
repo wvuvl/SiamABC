@@ -52,6 +52,7 @@ def compute_success_error(gt_center, result_center):
     return success
 
 
+
 def get_result_bb(arch, seq):
     result_path = join(arch, seq + '.txt')
     temp = np.loadtxt(result_path, delimiter=',').astype("float")
@@ -110,7 +111,9 @@ def eval_lasot_tune(result_path, json_path):
     n_seq = len(seqs)
     thresholds_overlap = np.arange(0, 1.05, 0.05)
     success_overlap = np.zeros((n_seq, 1, len(thresholds_overlap)))
-
+    thr_ce = np.arange(0, 51)
+    prec_overlap = np.zeros((n_seq, 1, len(thr_ce)))
+    
     for i in range(n_seq):
         seq = seqs[i]
         gt_rect = np.array(annos[seq]['gt_rect']).astype("float")
@@ -118,23 +121,51 @@ def eval_lasot_tune(result_path, json_path):
         bb = get_result_bb(result_path, seq)
         center = convert_bb_to_center(bb)
         success_overlap[i][0] = compute_success_overlap(gt_rect, bb)
+        prec_overlap[i][0] = compute_success_error(gt_center, center)
 
     auc = success_overlap[:, 0, :].mean()
-    return auc, center.mean()
+    prec = prec_overlap[:, 0, 20].mean()
+    succ_rate = success_overlap[:, 0, 10].mean()
+    
+    print(auc, prec, succ_rate)
+    return auc
+ 
 
+# if __name__ == "__main__":
+    
+#     # if len(sys.argv) < 5:
+#     #     print('python ./lib/core/eval_lasot.py LASOTTEST ./result SiamFC* 0 1')
+#     #     exit()
+#     # dataset = sys.argv[1]
+#     # result_path = sys.argv[2]
+#     # tracker_reg = sys.argv[3]
+#     # start = int(sys.argv[4])
+#     # end = int(sys.argv[5])
+#     # eval_auc(dataset, result_path, tracker_reg, start, end)
+#     # # eval_auc('LASOTTEST', './result', 'DSiam', 0, 1)
+    
+#     # result_path = '/home/ramzav/ray_results/fitness_2024-02-26_03-30-05/fitness_ea464821_317_lambda=0.0000,lr=0.7850,penalty_k=0.0160,window_influence=0.2730_2024-02-28_22-26-55/SiamABC/LASOT_penalty_k_0_0160_w_influence_0_2730_lr_0_7850_AUC_0.6060509374555272' #S
+    
+#     result_path = '/home/ramzav/ray_results/fitness_2024-02-23_16-40-56/fitness_d650e4c0_148_lambda=0.0050,lr=0.7770,penalty_k=0.0550,window_influence=0.1700_2024-02-25_23-14-23/SiamABC/LASOT_penalty_k_0_0550_w_influence_0_1700_lr_0_7770_AUC_0.5717421948558175' #M
+#     json_path = '/luna_data/zaveri/SOTA_Tracking_datasets/LaSOT/LASOTTEST.json'
+#     print(eval_lasot_tune(result_path, json_path))
+
+from got10k import experiments
 
 if __name__ == "__main__":
-    # if len(sys.argv) < 5:
-    #     print('python ./lib/core/eval_lasot.py LASOTTEST ./result SiamFC* 0 1')
-    #     exit()
-    # dataset = sys.argv[1]
-    # result_path = sys.argv[2]
-    # tracker_reg = sys.argv[3]
-    # start = int(sys.argv[4])
-    # end = int(sys.argv[5])
-    # eval_auc(dataset, result_path, tracker_reg, start, end)
+    LASOT_DIR = '/new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT'
+    result_path = '/home/ramzav/ray_results/fitness_2024-02-26_03-30-05/fitness_ea464821_317_lambda=0.0000,lr=0.7850,penalty_k=0.0160,window_influence=0.2730_2024-02-28_22-26-55/SiamABC/LASOT_penalty_k_0_0160_w_influence_0_2730_lr_0_7850_AUC_0.6060509374555272' 
+    json_path = '/new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LASOTTEST.json'
+    eval_lasot_tune(result_path, json_path)
+    
     # # eval_auc('LASOTTEST', './result', 'DSiam', 0, 1)
     
-    result_path = '/home/ramzav/ray_results/fitness_2023-11-12_01-50-30/fitness_d218e85a_263_lr=0.5630,penalty_k=0.0810,window_influence=0.1690_2023-11-15_03-01-34/SiamABC/LASOT_penalty_k_0_0810_w_influence_0_1690_lr_0_5630_AUC_0.5746879050854271'
-    json_path = '/luna_data/zaveri/SOTA_Tracking_datasets/LaSOT/LASOTTEST.json'
-    print(eval_lasot_tune(result_path, json_path))
+    # # result_path = '/home/ramzav/ray_results/fitness_2024-02-26_03-30-05/fitness_ea464821_317_lambda=0.0000,lr=0.7850,penalty_k=0.0160,window_influence=0.2730_2024-02-28_22-26-55/SiamABC/ ' #S
+    
+    # result_path = '/home/ramzav/ray_results/fitness_2024-02-23_16-40-56/fitness_d650e4c0_148_lambda=0.0050,lr=0.7770,penalty_k=0.0550,window_influence=0.1700_2024-02-25_23-14-23/SiamABC/LASOT_penalty_k_0_0160_w_influence_0_2730_lr_0_7850_AUC_0.6060509374555272' 
+    
+    # experiment = experiments.ExperimentLaSOT(LASOT_DIR)
+    # experiment.result_dir=result_path
+    
+    # # experiment.report(['LASOT_penalty_k_0_0160_w_influence_0_2730_lr_0_7850_AUC_0.6060509374555272'])
+    # experiment.report(['LASOT_penalty_k_0_0550_w_influence_0_1700_lr_0_7770_AUC_0.5717421948558175'])

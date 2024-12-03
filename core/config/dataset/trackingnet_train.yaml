@@ -35,7 +35,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/old_AEVT_envisioned/core/dataset_utils/filter_csv/trackingnet_0.csv
+        data_path: /new_local_storage/zaveri/code/old_SiamABC_envisioned/core/dataset_utils/filter_csv/trackingnet_0.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 10000 # 100000
@@ -48,7 +48,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/old_AEVT_envisioned/core/dataset_utils/filter_csv/trackingnet_1.csv
+        data_path: /new_local_storage/zaveri/code/old_SiamABC_envisioned/core/dataset_utils/filter_csv/trackingnet_1.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 10000 # 100000
@@ -61,7 +61,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/old_AEVT_envisioned/core/dataset_utils/filter_csv/trackingnet_2.csv
+        data_path: /new_local_storage/zaveri/code/old_SiamABC_envisioned/core/dataset_utils/filter_csv/trackingnet_2.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 10000 # 100000
@@ -74,7 +74,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/old_AEVT_envisioned/core/dataset_utils/filter_csv/trackingnet_3.csv
+        data_path: /new_local_storage/zaveri/code/old_SiamABC_envisioned/core/dataset_utils/filter_csv/trackingnet_3.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 10000 # 100000
@@ -87,7 +87,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/old_AEVT_envisioned/core/dataset_utils/filter_csv/trackingnet_4.csv
+        data_path: /new_local_storage/zaveri/code/old_SiamABC_envisioned/core/dataset_utils/filter_csv/trackingnet_4.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 10000 # 100000
@@ -100,7 +100,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/old_AEVT_envisioned/core/dataset_utils/filter_csv/trackingnet_5.csv
+        data_path: /new_local_storage/zaveri/code/old_SiamABC_envisioned/core/dataset_utils/filter_csv/trackingnet_5.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 10000 # 100000
@@ -113,7 +113,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/old_AEVT_envisioned/core/dataset_utils/filter_csv/trackingnet_6.csv
+        data_path: /new_local_storage/zaveri/code/old_SiamABC_envisioned/core/dataset_utils/filter_csv/trackingnet_6.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 10000 # 100000
@@ -126,7 +126,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/old_AEVT_envisioned/core/dataset_utils/filter_csv/trackingnet_7.csv
+        data_path: /new_local_storage/zaveri/code/old_SiamABC_envisioned/core/dataset_utils/filter_csv/trackingnet_7.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 10000 # 100000
@@ -139,7 +139,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/old_AEVT_envisioned/core/dataset_utils/filter_csv/trackingnet_8.csv
+        data_path: /new_local_storage/zaveri/code/old_SiamABC_envisioned/core/dataset_utils/filter_csv/trackingnet_8.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 10000 # 100000
@@ -152,7 +152,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/old_AEVT_envisioned/core/dataset_utils/filter_csv/trackingnet_9.csv
+        data_path: /new_local_storage/zaveri/code/old_SiamABC_envisioned/core/dataset_utils/filter_csv/trackingnet_9.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 10000 # 100000

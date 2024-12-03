@@ -85,6 +85,6 @@ def eval_uav123_tune(result_path, json_path):
 
 if __name__ == "__main__":
     
-    result_path = '/new_local_storage/zaveri/code/experiments/2023-10-17-01-22-46_Tracking_AEVT_do_dynamic_search/AEVT/results/UAV123/AEVTTracker'
+    result_path = '/new_local_storage/zaveri/code/experiments/2023-10-17-01-22-46_Tracking_SiamABC_do_dynamic_search/SiamABC/results/UAV123/SiamABCTracker'
     json_path = '/new_local_storage/zaveri/SOTA_Tracking_datasets/UAV123/UAV123.json'
     print(eval_uav123_tune(result_path, json_path))

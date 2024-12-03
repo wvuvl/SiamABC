@@ -16,8 +16,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.backends.cudnn as cudnn
 
 from core.metrics import DatasetAwareMetric, BoxIoUMetric, TrackingFailureRateMetric, box_iou_metric
-from core.models.loss import AEVTLoss
-from core.utils.box_coder import TrackerDecodeResult, AEVTBoxCoder
+from core.models.loss import SiamABCLoss
+from core.utils.box_coder import TrackerDecodeResult, SiamABCBoxCoder
 from core.utils.utils import read_img, get_iou, plot_loss
 
 from core.utils.logger import create_logger
@@ -51,7 +51,7 @@ def get_collate_for_dataset(dataset: Union[Dataset, ConcatDataset]):
         collate_fn = collates[0]
     return collate_fn
 
-class AEVT_train_val:
+class SiamABC_train_val:
     input_type = torch.float32
     target_type = torch.float32
     def __init__(self, model: torch.nn.Module, 
@@ -106,7 +106,7 @@ class AEVT_train_val:
             }
         )
         self.dataset_aware_metric = DatasetAwareMetric(metric_name="box_iou", metric_fn=box_iou_metric)
-        self.criterion = AEVTLoss(coeffs=config["loss"]["coeffs"]).to(self.device_id)
+        self.criterion = SiamABCLoss(coeffs=config["loss"]["coeffs"]).to(self.device_id)
         
         
         self.train_dl, self.train_sampler = self._get_dataloader(self.train_dataset, "train")
@@ -167,7 +167,7 @@ class AEVT_train_val:
     def configure_optimizers(self):
         lr = 1e-04
         print('Learning Rate - Set: ', lr)
-        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=lr)
+        self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=lr)
 
         # self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1, gamma=0.5, verbose=True)
         
@@ -220,7 +220,7 @@ class AEVT_train_val:
                     .format(class_loss, regression_loss, search_sim_loss, dynamic_sim_loss, dissim_loss))
             
 
-            if e%20==0:
+            if e%5==0:
                 if self.val_dl is not None:
                     if self.use_ddp: self.val_sampler.set_epoch(e)
                     val_iou = self.validate_network(self.val_dl)

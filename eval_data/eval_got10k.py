@@ -134,6 +134,6 @@ if __name__ == "__main__":
     # end = int(sys.argv[5])
     # eval_auc(dataset, result_path, tracker_reg, start, end)
 
-    result_path = '/new_local_storage/zaveri/code/experiments/2023-10-18-00-35-15_Tracking_SiamABC_dynamic_updates_TTA_style_every_150_resnet/AEVT/results/GOT-10k/AEVTTracker'
+    result_path = '/new_local_storage/zaveri/code/experiments/2023-10-18-00-35-15_Tracking_SiamABC_dynamic_updates_TTA_style_every_150_resnet/SiamABC/results/GOT-10k/SiamABCTracker'
     json_path = '/new_local_storage/zaveri/SOTA_Tracking_datasets/GOT10k/GOT10k/GOT10KVAL.json'
     print(eval_got10k_tune(result_path, json_path))

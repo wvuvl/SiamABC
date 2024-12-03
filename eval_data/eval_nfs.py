@@ -118,6 +118,6 @@ def eval_nfs_tune(result_path, json_path):
 
 if __name__ == "__main__":
     
-    result_path = '/home/ramzav/ray_results/fitness_2023-11-19_23-31-04/fitness_7c6b8fb5_108_lr=0.6700,penalty_k=0.0550,window_influence=0.4480_2023-11-20_10-22-45/SiamABC/NFS240_penalty_k_0_0550_w_influence_0_4480_lr_0_6700_AUC_0.6641110557116641'
-    json_path = '/luna_data/zaveri/SOTA_Tracking_datasets/NFS/NFS240.json'
+    result_path = '/home/ramzav/ray_results/fitness_2024-02-26_03-41-30/fitness_3a18c0c9_392_lambda=0.0050,lr=0.7810,penalty_k=0.1490,window_influence=0.1720_2024-02-27_06-36-23/SiamABC/NFS30_penalty_k_0_1490_w_influence_0_1720_lr_0_7810_AUC_0.623344632655296'
+    json_path = '/luna_data/zaveri/SOTA_Tracking_datasets/NFS/NFS30.json'
     print(eval_nfs(result_path, json_path))

@@ -5,7 +5,7 @@ from typing import Any, Dict
 from tqdm import trange, tqdm
 import numpy as np
 import pandas as pd
-
+import os
 
 class TrackSampler(ABC):
     def __init__(
@@ -81,7 +81,10 @@ class TrackSampler(ABC):
         data = data.drop(dropped_negatives)
         data = data.reset_index(drop=True)
         # if self.filter_data: data = self.drop_seq_with_all_neg(data)
-        data = self.drop_bad_bboxes(data)
+        
+        if 'refined' not in self.data_path:
+            data = self.drop_bad_bboxes(data)
+            data.to_csv(os.path.splitext(self.data_path)[0]+'_refined.csv')
         return data
 
     def resample(self) -> None:
@@ -119,13 +122,50 @@ class TrackSampler(ABC):
         template_item = self.epoch_data.iloc[idx]
         track_indices = self.mapping[template_item["track_id"]]
         search_items = self.data.iloc[track_indices]
-        search_item = (search_items.sample(1).iloc[0])
+        
+        # search_item = (search_items.sample(1).iloc[0])
         
         frame_offset = 10 if template_item["dataset"]=='ytbb' else self.frame_offset
-            
-        dynamic_template_item = (
+        
+        
+        # dynamic_template_item = (
+        #     search_items[
+        #         (search_items["frame_index"] >= search_item["frame_index"] - frame_offset)
+        #         # (search_items["frame_index"] <= search_item["frame_index"] + frame_offset) 
+        #         # & (search_items["frame_index"] >= search_item["frame_index"] - frame_offset//2)
+        #         # & (search_items["presence"] == 1)
+        #     ]
+        #     .sample(1)
+        #     .iloc[0]
+        # )
+        
+        # dynamic_search_item = (
+        #     search_items[
+        #         (search_items["frame_index"] >= search_item["frame_index"] - frame_offset)
+        #         # (search_items["frame_index"] <= search_item["frame_index"] + frame_offset) 
+        #         # & (search_items["frame_index"] >= search_item["frame_index"] - frame_offset//2)
+        #         # & (search_items["presence"] == 1)
+        #     ]
+        #     .sample(1)
+        #     .iloc[0]
+        # )
+        
+        
+        # return dict(template=template_item, dynamic_template=dynamic_template_item, search=search_item, dynamic_search=dynamic_search_item, prev_dynamic_search=dynamic_template_item)   
+        
+        search_item = (
             search_items[
-                (search_items["frame_index"] >= search_item["frame_index"] - frame_offset)
+                (search_items["frame_index"] >= template_item["frame_index"])
+                & (search_items["frame_index"] <= template_item["frame_index"] + frame_offset)
+            ]
+            .sample(1)
+            .iloc[0]
+        )
+        
+        dynamic_item = (
+            search_items[
+                (search_items["frame_index"] <= search_item["frame_index"])
+                & (search_items["frame_index"] >= template_item["frame_index"])
                 # (search_items["frame_index"] <= search_item["frame_index"] + frame_offset) 
                 # & (search_items["frame_index"] >= search_item["frame_index"] - frame_offset//2)
                 # & (search_items["presence"] == 1)
@@ -134,25 +174,13 @@ class TrackSampler(ABC):
             .iloc[0]
         )
         
-        dynamic_search_item = (
-            search_items[
-                (search_items["frame_index"] >= search_item["frame_index"] - frame_offset)
-                # (search_items["frame_index"] <= search_item["frame_index"] + frame_offset) 
-                # & (search_items["frame_index"] >= search_item["frame_index"] - frame_offset//2)
-                # & (search_items["presence"] == 1)
-            ]
-            .sample(1)
-            .iloc[0]
-        )
-        
-        return dict(template=template_item, dynamic_template=dynamic_template_item, search=search_item, dynamic_search=dynamic_search_item, prev_dynamic_search=dynamic_template_item)   
-        # return dict(template=template_item, dynamic_template=dynamic_template_item, search=search_item, dynamic_search=dynamic_search_item, prev_dynamic_search=prev_dynamic_search_item)
-
+        return dict(template=template_item, dynamic_template=dynamic_item, search=search_item, dynamic_search=dynamic_item, prev_dynamic_search=dynamic_item)
+    
 if __name__ == '__main__':
     import time
     # from utils import read_img
 
-    data_path = '/new_local_storage/zaveri/code/old_AEVT_copy/core/dataset_utils/got10k.csv'
+    data_path = '/new_local_storage/zaveri/code/old_SiamABC_copy/core/dataset_utils/got10k.csv'
     sampler = TrackSampler(data_path,negative_ratio=1.,frame_offset=70,num_samples=300000, filter_data=True)
     sampler.parse_samples()
     samples = sampler.extract_sample(12)

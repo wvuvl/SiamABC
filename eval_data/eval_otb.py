@@ -177,8 +177,8 @@ if __name__ == "__main__":
     #     print('python ./lib/core/eval_otb.py OTB2015 ./result Ocean* 0 1')
     #     exit()
     dataset ='OTB2015' # sys.argv[1]
-    result_path = '/new_local_storage/zaveri/code/experiments/2023-10-24-14-21-01_Tracking_AEVT/AEVT/results/OTB2015/AEVTTracker' #sys.argv[2]
-    tracker_reg = 'AEVT*' #sys.argv[3]
+    result_path = '/new_local_storage/zaveri/code/experiments/2023-10-24-14-21-01_Tracking_SiamABC/SiamABC/results/OTB2015/SiamABCTracker' #sys.argv[2]
+    tracker_reg = 'SiamABC*' #sys.argv[3]
     start = 0 #int(sys.argv[4])
     end = 1 #int(sys.argv[5])
     json_path = '/new_local_storage/zaveri/SOTA_Tracking_datasets/OTB/OTB.json'

@@ -1,4 +1,4 @@
-_target_: AEVT_tracker.AEVTTracker
+_target_: SiamABC_tracker.SiamABCTracker
 penalty_k:  0.062 #0.074 #0.045 #0.062 #0.011 #0.062
 window_influence: 0.38 #0.198 #0.38 #0.214 #0.38
 lr: 0.765 # 0.743 # 0.765 #0.429 #0.765
@@ -10,8 +10,7 @@ dynamic_update: false
 similarity_score: false
 # ratio: 0.94
 stride: ${model.stride}
-smooth: true
-
+smooth: false
 
 bbox_ratio: 0.5
 template_bbox_offset: 0.2

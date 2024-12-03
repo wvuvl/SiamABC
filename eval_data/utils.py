@@ -550,7 +550,7 @@ def load_dataset(dataset, base_path, json_path=None):
                 # ground truth
                 gt_path = join(s_video_path, 'groundtruth.txt')
                 gt = np.loadtxt(gt_path, delimiter=',')
-                gt = gt #- [1, 1, 0, 0]
+                gt = gt - [1, 1, 0, 0]
                 # get img file
                 img_path = join(s_video_path, 'img', '*jpg')
                 image_files = sorted(glob.glob(img_path))
@@ -572,7 +572,7 @@ def load_dataset(dataset, base_path, json_path=None):
         print(info.keys())
         for v in info.keys():
             info[v]['image_files'] = [join(base_path, info[v]['video_dir'], im_f) for im_f in info[v]['img_names']]
-            info[v]['gt'] = np.array(info[v]['gt_rect']) # - [1, 1, 0, 0]
+            info[v]['gt'] = np.array(info[v]['gt_rect']) #- [1, 1, 0, 0]
             info[v]['name'] = v
             
             

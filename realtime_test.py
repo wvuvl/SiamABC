@@ -8,21 +8,21 @@ from tqdm import tqdm
 from hydra.utils import instantiate
 from typing import Optional, List
 
-from AEVT_tracker import AEVTTracker
+from SiamABC_tracker import SiamABCTracker
 from core.utils.torch_stuff import load_from_lighting
 from core.utils.hydra import load_hydra_config_from_path
 
     
 
-def get_tracker(config_path: str, config_name: str, weights_path: str) -> AEVTTracker:
+def get_tracker(config_path: str, config_name: str, weights_path: str) -> SiamABCTracker:
     config = load_hydra_config_from_path(config_path=config_path, config_name=config_name)
     model = instantiate(config["model"])
     model = load_from_lighting(model, weights_path).cuda().eval()
-    tracker: AEVTTracker = instantiate(config["tracker"], model=model)
+    tracker: SiamABCTracker = instantiate(config["tracker"], model=model)
     return tracker
 
 
-def track(tracker: AEVTTracker, frames: List[np.ndarray], initial_bbox: np.ndarray) -> List[np.ndarray]:
+def track(tracker: SiamABCTracker, frames: List[np.ndarray], initial_bbox: np.ndarray) -> List[np.ndarray]:
     tracked_bboxes = [initial_bbox]
     tracker.initialize(frames[0], initial_bbox)
     
@@ -67,8 +67,8 @@ def main(
     video_path: str = "assets/airplane_in_rain.mp4",
     output_path: str = "outputs/airplane_in_rain.mp4",
     config_path: str = "core/config",
-    config_name: str = "AEVT_tracker",
-    weights_path: str = "/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/experiments/2023-08-22-12-26-28_Tracking_AEVT/AEVT/trained_model_ckpt_7.pt",
+    config_name: str = "SiamABC_tracker",
+    weights_path: str = "/media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/experiments/2023-08-22-12-26-28_Tracking_SiamABC/SiamABC/trained_model_ckpt_7.pt",
 ):
     tracker = get_tracker(config_path=config_path, config_name=config_name, weights_path=weights_path)
     video, metadata = iio.imread(video_path), iio.immeta(video_path, exclude_applied=False)

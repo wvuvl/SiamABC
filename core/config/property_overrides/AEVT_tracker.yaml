@@ -1,4 +1,4 @@
 # @package _global_
 experiment:
-  name: AEVT
+  name: SiamABC
 dataset_type: siam

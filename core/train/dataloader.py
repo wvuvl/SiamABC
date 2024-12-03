@@ -16,7 +16,7 @@ from torch.utils.data.dataloader import default_collate
 
 from core.utils.gaussian_map import gaussian_label_function
 from core.train.preprocessing import BBoxCropWithOffsets, get_normalize_fn, TRACKING_AUGMENTATIONS, PHOTOMETRIC_AUGMENTATIONS
-from core.utils.box_coder import AEVTBoxCoder
+from core.utils.box_coder import SiamABCBoxCoder
 from core.utils.utils import handle_empty_bbox, read_img, ensure_bbox_boundaries, convert_center_to_bbox, get_extended_crop, get_regression_weight_label, extend_bbox, convert_xywh_to_xyxy
 import core.constants as constants
 
@@ -172,7 +172,7 @@ class TrackingDataset(ABC):
         self.max_deep_supervision_stride: Optional[int] = config.get("max_deep_supervision_stride", None)
         self.search_context = self.sizes_config["search_context"] * 2
         self.common_transforms = PHOTOMETRIC_AUGMENTATIONS
-        self.box_coder = AEVTBoxCoder(config["tracker"])
+        self.box_coder = SiamABCBoxCoder(config["tracker"])
         self.negative_sample_probability_threshold = 0.5
         
     def __str__(self):
@@ -340,7 +340,7 @@ class TrackingDataset(ABC):
     
     
     
-    def get_search_transform(self, image: np.array, bbox: np.array, context: np.array = None, presense=True) -> Tuple[np.array, np.array]:
+    def get_search_transform(self, image: np.array, bbox: np.array, context: np.array = None, presense=True, aug=True) -> Tuple[np.array, np.array]:
         search_size = self.sizes_config["search_image_size"]
         crop, bbox, context = get_extended_crop(
             image=image,
@@ -358,12 +358,21 @@ class TrackingDataset(ABC):
                     search_size,
                 ],
             )
-            crop_aug = BBoxCropWithOffsets(
-                bbox_crop=bbox_crop,
-                scale=self.sizes_config["search_image_scale"],
-                shift=self.sizes_config["search_image_shift"],
-                crop_size=search_size
-            )
+            
+            if aug:
+                crop_aug = BBoxCropWithOffsets(
+                    bbox_crop=bbox_crop,
+                    scale=self.sizes_config["search_image_scale"],
+                    shift=self.sizes_config["search_image_shift"],
+                    crop_size=search_size
+                )
+            else:
+                crop_aug = BBoxCropWithOffsets(
+                    bbox_crop=bbox_crop,
+                    scale=0,
+                    shift=0,
+                    crop_size=search_size
+                )
             result = crop_aug(image=crop, bboxes=[bbox])
             crop, bbox = result["image"], result["bboxes"][0]
             
@@ -385,23 +394,23 @@ class TrackingDataset(ABC):
             crop_size=template_size,
             context=context
         )
-    
-        # bbox_crop = convert_center_to_bbox(
-        #     [
-        #         crop.shape[0] // 2,
-        #         crop.shape[1] // 2,
-        #         template_size,
-        #         template_size,
-        #     ],
-        # )
-        # crop_aug = BBoxCropWithOffsets(
-        #     bbox_crop=bbox_crop,
-        #     scale=self.sizes_config["template_image_scale"],
-        #     shift=self.sizes_config["template_image_shift"],
-        #     crop_size=template_size
-        # )
-        # result = crop_aug(image=crop, bboxes=[bbox])
-        # crop, bbox = result["image"], result["bboxes"][0]
+        if aug:
+            bbox_crop = convert_center_to_bbox(
+                [
+                    crop.shape[0] // 2,
+                    crop.shape[1] // 2,
+                    template_size,
+                    template_size,
+                ],
+            )
+            crop_aug = BBoxCropWithOffsets(
+                bbox_crop=bbox_crop,
+                scale=self.sizes_config["template_image_scale"],
+                shift=self.sizes_config["template_image_shift"],
+                crop_size=template_size
+            )
+            result = crop_aug(image=crop, bboxes=[bbox])
+            crop, bbox = result["image"], result["bboxes"][0]
         
         
         bbox = handle_empty_bbox(
@@ -447,18 +456,16 @@ class TrackingDataset(ABC):
 
     
     def _get_crops(self, item_data):
-        template_crop, template_bbox = self.get_template_transform(item_data["template_image"], item_data["template_bbox"], aug=True)
-        dynamic_template_crop, dynamic_template_bbox = self.get_template_transform(item_data["dynamic_template_image"], item_data["dynamic_template_bbox"], aug=True)
-        
-
-        
+        template_crop, template_bbox = self.get_template_transform(item_data["template_image"], item_data["template_bbox"], aug=False)
+        dynamic_template_crop, dynamic_template_bbox = self.get_template_transform(item_data["dynamic_template_image"], item_data["dynamic_template_bbox"], aug=False)
+                
         offset = self._get_search_context()
         dynamic_search_context = extend_bbox(item_data["dynamic_search_bbox"], image_width=item_data["dynamic_search_image"].shape[1], image_height=item_data["dynamic_search_image"].shape[0], offset=offset)
-        dynamic_search_crop, dynamic_search_bbox = self.get_search_transform(item_data["dynamic_search_image"], item_data["dynamic_search_bbox"], context=dynamic_search_context)
+        dynamic_search_crop, dynamic_search_bbox = self.get_search_transform(item_data["dynamic_search_image"], item_data["dynamic_search_bbox"], context=dynamic_search_context, aug=True)
 
         offset = self._get_search_context()
         search_context = extend_bbox(item_data["search_bbox"], image_width=item_data["search_image"].shape[1], image_height=item_data["search_image"].shape[0], offset=offset)
-        search_crop, search_bbox = self.get_search_transform(item_data["search_image"], item_data["search_bbox"], context=search_context)        
+        search_crop, search_bbox = self.get_search_transform(item_data["search_image"], item_data["search_bbox"], context=search_context, aug=True)        
         
         return template_crop, template_bbox, dynamic_template_crop, dynamic_template_bbox, search_crop, search_bbox, dynamic_search_crop, dynamic_search_bbox
 

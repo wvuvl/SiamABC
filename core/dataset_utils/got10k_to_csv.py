@@ -36,7 +36,7 @@ sequence_list = [dir_name[0] for dir_name in sequence_list]
 
 all_categories = '/new_local_storage/zaveri/code/SiamABC/core/dataset_utils/data_specs/got10k_train_full_split.txt'
 vot_exclude = '/new_local_storage/zaveri/code/SiamABC/core/dataset_utils/data_specs/got10k_vot_exclude.txt'
-# valid_vot_categories = '/data/zaveri/code/AEVT/core/dataset_utils/data_specs/got10k_vot_train_split.txt'
+# valid_vot_categories = '/data/zaveri/code/SiamABC/core/dataset_utils/data_specs/got10k_vot_train_split.txt'
 
 seq_ids =np.array(pd.read_csv(all_categories, header=None).values.tolist(), dtype=np.int64).squeeze()
 sequence_list = [sequence_list[i] for i in seq_ids]

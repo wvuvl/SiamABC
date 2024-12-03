@@ -84,10 +84,10 @@ def main(output_dir="TrackingNet", save_file="trackingnet.csv", chunks=[]):
             # df = pd.DataFrame(data, columns=["sequence_id","track_id","frame_index","img_path","bbox","frame_shape","dataset","presence","near_corner"])
 
             
-    # df = pd.DataFrame(data, columns=["sequence_id","track_id","frame_index","img_path","bbox","frame_shape","dataset","presence","near_corner"])
-    # df.to_csv(save_file)
-    with open(f"TrackingNet_{chunk_folder}.json", "w") as outfile: 
-        json.dump(json_dict, outfile)
+    df = pd.DataFrame(data, columns=["sequence_id","track_id","frame_index","img_path","bbox","frame_shape","dataset","presence","near_corner"])
+    df.to_csv(save_file)
+    # with open(f"TrackingNet_{chunk_folder}.json", "w") as outfile: 
+    #     json.dump(json_dict, outfile)
 
 
 
@@ -97,7 +97,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description='Download the frames for TrackingNet')
     p.add_argument('--output_dir', type=str, default=path,
         help='Main TrackingNet folder.')
-    p.add_argument('--save_file', type=str, default=False,
+    p.add_argument('--save_file', type=str, default='trackingnet.csv',
         help='Folder where to store the csv file.')
     p.add_argument('--chunk', type=str, default="ALL",
         help='List of chunks to elaborate [ALL / 4 / 1,2,5].')

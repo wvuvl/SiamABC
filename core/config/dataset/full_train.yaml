@@ -31,7 +31,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/GOT10k/GOT10k
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/SiamABC/core/dataset_utils/got10k_vot_excluded.csv #/new_local_storage/zaveri/code/data/filtered_csvs/filtered_got10k.csv
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/got10k_vot_excluded_refined.csv #/new_local_storage/zaveri/code/data/filtered_csvs/filtered_got10k_refined.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 300000 # 100000
@@ -40,12 +40,12 @@ train:
       sizes: ${sizes}
       stride: ${model.stride}
     
-    # # LaSOT
+    # LaSOT
     - dataset_type: ${dataset_type}
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/SiamABC/core/dataset_utils/lasot.csv #/new_local_storage/zaveri/code/data/filtered_csvs/filtered_lasot.csv
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/lasot_refined.csv #/new_local_storage/zaveri/code/data/filtered_csvs/filtered_lasot_refined.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 100000 # 100000
@@ -60,7 +60,7 @@ train:
       root: /new_local_storage/zaveri/SOTA_Tracking_datasets/coco2017
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/SiamABC/core/dataset_utils/coco2017.csv #/new_local_storage/zaveri/code/data/filtered_csvs/filtered_coco.csv
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/coco2017_refined.csv #/new_local_storage/zaveri/code/data/filtered_csvs/filtered_coco_refined.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 200000 # 100000
@@ -69,12 +69,41 @@ train:
       sizes: ${sizes}
       stride: ${model.stride}
 
-    # ImageNet2014
+    # # # ImageNet2014
+    # # - dataset_type: ${dataset_type}
+    # #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/ILSVRC2014_DET_train
+    # #   sampling:
+    # #     _target_: core.utils.sampler.TrackSampler
+    # #     data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/imagenet2014_refined.csv #/new_local_storage/zaveri/code/data/filtered_csvs/filtered_imagenet_refined.csv
+    # #     negative_ratio: ${negative_ratio}
+    # #     frame_offset: ${frame_offset}
+    # #     num_samples: 200000 # 100000
+    # #   transform: photometric
+    # #   regression_weight_label_size: ${tracker.score_size}
+    # #   sizes: ${sizes}
+    # #   stride: ${model.stride}
+    
+    # # ytbb
+    # # - dataset_type: ${dataset_type}
+    # #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/ILSVRC2014_DET_train
+    # #   sampling:
+    # #     _target_: core.utils.sampler.TrackSampler
+    # #     data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/ytbb_train_refined.csv #/new_local_storage/zaveri/code/data/filtered_csvs/filtered_ytbb_refined.csv
+    # #     negative_ratio: ${negative_ratio}
+    # #     frame_offset: ${frame_offset}
+    # #     num_samples: 400000 # 100000
+    # #   transform: photometric
+    # #   regression_weight_label_size: ${tracker.score_size}
+    # #   sizes: ${sizes}
+    # #   stride: ${model.stride}
+
+    # # TrackingNet Parts
+    # TRAIN_0
     - dataset_type: ${dataset_type}
-      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/ILSVRC2014_DET_train
+      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/SiamABC/core/dataset_utils/imagenet2014.csv #/new_local_storage/zaveri/code/data/filtered_csvs/filtered_imagenet.csv
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/trackingnet_0_refined.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
         num_samples: 200000 # 100000
@@ -82,189 +111,160 @@ train:
       regression_weight_label_size: ${tracker.score_size}
       sizes: ${sizes}
       stride: ${model.stride}
-    
-    # ytbb
+
+    # TRAIN_1
     - dataset_type: ${dataset_type}
-      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/ILSVRC2014_DET_train
+      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
       sampling:
         _target_: core.utils.sampler.TrackSampler
-        data_path: /new_local_storage/zaveri/code/SiamABC/core/dataset_utils/ytbb_train.csv #/new_local_storage/zaveri/code/data/filtered_csvs/filtered_ytbb.csv
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/trackingnet_1_refined.csv
         negative_ratio: ${negative_ratio}
         frame_offset: ${frame_offset}
-        num_samples: 400000 # 100000
+        num_samples: 50000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
+    
+    # TRAIN_2
+    - dataset_type: ${dataset_type}
+      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/trackingnet_2_refined.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 50000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
+    
+    # TRAIN_3
+    - dataset_type: ${dataset_type}
+      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/trackingnet_3_refined.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 50000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
+    
+    # TRAIN_4
+    - dataset_type: ${dataset_type}
+      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/trackingnet_4_refined.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 50000 # 100000
       transform: photometric
       regression_weight_label_size: ${tracker.score_size}
       sizes: ${sizes}
       stride: ${model.stride}
 
-    # # # TrackingNet Parts
-    # # TRAIN_0
-    # - dataset_type: ${dataset_type}
-    #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   sampling:
-    #     _target_: core.utils.sampler.TrackSampler
-    #     data_path: /new_local_storage/zaveri/code/SiamABC/core/dataset_utils/trackingnet_0.csv
-    #     negative_ratio: ${negative_ratio}
-    #     frame_offset: ${frame_offset}
-    #     num_samples: 200000 # 100000
-    #   transform: photometric
-    #   regression_weight_label_size: ${tracker.score_size}
-    #   sizes: ${sizes}
-    #   stride: ${model.stride}
+    # TRAIN_5
+    - dataset_type: ${dataset_type}
+      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/trackingnet_5_refined.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 50000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
 
-    # # TRAIN_1
-    # - dataset_type: ${dataset_type}
-    #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   sampling:
-    #     _target_: core.utils.sampler.TrackSampler
-    #     data_path: /new_local_storage/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_1.csv
-    #     negative_ratio: ${negative_ratio}
-    #     frame_offset: ${frame_offset}
-    #     num_samples: 50000 # 100000
-    #   transform: photometric
-    #   regression_weight_label_size: ${tracker.score_size}
-    #   sizes: ${sizes}
-    #   stride: ${model.stride}
-    
-    # # TRAIN_2
-    # - dataset_type: ${dataset_type}
-    #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   sampling:
-    #     _target_: core.utils.sampler.TrackSampler
-    #     data_path: /new_local_storage/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_2.csv
-    #     negative_ratio: ${negative_ratio}
-    #     frame_offset: ${frame_offset}
-    #     num_samples: 50000 # 100000
-    #   transform: photometric
-    #   regression_weight_label_size: ${tracker.score_size}
-    #   sizes: ${sizes}
-    #   stride: ${model.stride}
-    
-    # # TRAIN_3
-    # - dataset_type: ${dataset_type}
-    #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   sampling:
-    #     _target_: core.utils.sampler.TrackSampler
-    #     data_path: /new_local_storage/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_3.csv
-    #     negative_ratio: ${negative_ratio}
-    #     frame_offset: ${frame_offset}
-    #     num_samples: 50000 # 100000
-    #   transform: photometric
-    #   regression_weight_label_size: ${tracker.score_size}
-    #   sizes: ${sizes}
-    #   stride: ${model.stride}
-    
-    # # TRAIN_4
-    # - dataset_type: ${dataset_type}
-    #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   sampling:
-    #     _target_: core.utils.sampler.TrackSampler
-    #     data_path: /new_local_storage/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_4.csv
-    #     negative_ratio: ${negative_ratio}
-    #     frame_offset: ${frame_offset}
-    #     num_samples: 50000 # 100000
-    #   transform: photometric
-    #   regression_weight_label_size: ${tracker.score_size}
-    #   sizes: ${sizes}
-    #   stride: ${model.stride}
+    # TRAIN_6
+    - dataset_type: ${dataset_type}
+      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/trackingnet_6_refined.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 50000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
 
-    # # TRAIN_5
-    # - dataset_type: ${dataset_type}
-    #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   sampling:
-    #     _target_: core.utils.sampler.TrackSampler
-    #     data_path: /new_local_storage/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_5.csv
-    #     negative_ratio: ${negative_ratio}
-    #     frame_offset: ${frame_offset}
-    #     num_samples: 50000 # 100000
-    #   transform: photometric
-    #   regression_weight_label_size: ${tracker.score_size}
-    #   sizes: ${sizes}
-    #   stride: ${model.stride}
+    # TRAIN_7
+    - dataset_type: ${dataset_type}
+      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/trackingnet_7_refined.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 50000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
 
-    # # TRAIN_6
-    # - dataset_type: ${dataset_type}
-    #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   sampling:
-    #     _target_: core.utils.sampler.TrackSampler
-    #     data_path: /new_local_storage/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_6.csv
-    #     negative_ratio: ${negative_ratio}
-    #     frame_offset: ${frame_offset}
-    #     num_samples: 50000 # 100000
-    #   transform: photometric
-    #   regression_weight_label_size: ${tracker.score_size}
-    #   sizes: ${sizes}
-    #   stride: ${model.stride}
+    # TRAIN_8
+    - dataset_type: ${dataset_type}
+      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/trackingnet_8_refined.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 50000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
 
-    # # TRAIN_7
-    # - dataset_type: ${dataset_type}
-    #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   sampling:
-    #     _target_: core.utils.sampler.TrackSampler
-    #     data_path: /new_local_storage/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_7.csv
-    #     negative_ratio: ${negative_ratio}
-    #     frame_offset: ${frame_offset}
-    #     num_samples: 50000 # 100000
-    #   transform: photometric
-    #   regression_weight_label_size: ${tracker.score_size}
-    #   sizes: ${sizes}
-    #   stride: ${model.stride}
+    # TRAIN_9
+    - dataset_type: ${dataset_type}
+      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/trackingnet_9_refined.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 50000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
 
-    # # TRAIN_8
-    # - dataset_type: ${dataset_type}
-    #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   sampling:
-    #     _target_: core.utils.sampler.TrackSampler
-    #     data_path: /new_local_storage/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_8.csv
-    #     negative_ratio: ${negative_ratio}
-    #     frame_offset: ${frame_offset}
-    #     num_samples: 50000 # 100000
-    #   transform: photometric
-    #   regression_weight_label_size: ${tracker.score_size}
-    #   sizes: ${sizes}
-    #   stride: ${model.stride}
+    # TRAIN_10
+    - dataset_type: ${dataset_type}
+      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/trackingnet_10_refined.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 50000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
 
-    # # TRAIN_9
-    # - dataset_type: ${dataset_type}
-    #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   sampling:
-    #     _target_: core.utils.sampler.TrackSampler
-    #     data_path: /new_local_storage/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_9.csv
-    #     negative_ratio: ${negative_ratio}
-    #     frame_offset: ${frame_offset}
-    #     num_samples: 50000 # 100000
-    #   transform: photometric
-    #   regression_weight_label_size: ${tracker.score_size}
-    #   sizes: ${sizes}
-    #   stride: ${model.stride}
-
-    # # TRAIN_10
-    # - dataset_type: ${dataset_type}
-    #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   sampling:
-    #     _target_: core.utils.sampler.TrackSampler
-    #     data_path: /new_local_storage/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_10.csv
-    #     negative_ratio: ${negative_ratio}
-    #     frame_offset: ${frame_offset}
-    #     num_samples: 50000 # 100000
-    #   transform: photometric
-    #   regression_weight_label_size: ${tracker.score_size}
-    #   sizes: ${sizes}
-    #   stride: ${model.stride}
-
-    # # TRAIN_11
-    # - dataset_type: ${dataset_type}
-    #   root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-    #   sampling:
-    #     _target_: core.utils.sampler.TrackSampler
-    #     data_path: /new_local_storage/zaveri/code/old_AEVT/core/dataset_utils/trackingnet_11.csv
-    #     negative_ratio: ${negative_ratio}
-    #     frame_offset: ${frame_offset}
-    #     num_samples: 50000 # 100000
-    #   transform: photometric
-    #   regression_weight_label_size: ${tracker.score_size}
-    #   sizes: ${sizes}
-    #   stride: ${model.stride}
+    # TRAIN_11
+    - dataset_type: ${dataset_type}
+      root: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
+      sampling:
+        _target_: core.utils.sampler.TrackSampler
+        data_path: /new_local_storage/zaveri/code/SiamABC_cross_att/core/dataset_utils/train_csvs/trackingnet_11_refined.csv
+        negative_ratio: ${negative_ratio}
+        frame_offset: ${frame_offset}
+        num_samples: 50000 # 100000
+      transform: photometric
+      regression_weight_label_size: ${tracker.score_size}
+      sizes: ${sizes}
+      stride: ${model.stride}
 
 
 val:
@@ -306,11 +306,10 @@ test:
     # - name: nfs
     #   root_dir: /new_local_storage/zaveri/SOTA_Tracking_datasets/NFS/NFS/NFS
     #   fps: 240
-    # - name: lasot
-    #   root_dir: /new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT
-    #   file_path: /new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT/testing_set.txt
-    #   choose: 50
-    - name: trackingnet
-      root_dir: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
-      chunk_folder: TRAIN_11
-      choose: -1
+    - name: lasot
+      root_dir: /new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT
+      file_path: /new_local_storage/zaveri/SOTA_Tracking_datasets/LaSOT/LaSOT/testing_set.txt
+      choose: 50
+    # - name: trackingnet
+    #   root_dir: /new_local_storage/zaveri/SOTA_Tracking_datasets/TrackingNet
+    #   chunk_folder: TRAIN_11

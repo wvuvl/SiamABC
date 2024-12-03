@@ -22,3 +22,5 @@ imageio==2.20.0
 imageio-ffmpeg==0.4.7
 protobuf<4.21.0
 git+https://github.com/KupynOrest/toolkit.git
+
+

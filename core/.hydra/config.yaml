@@ -1,0 +1,117 @@
+num_workers: 4
+gpus:
+- 0
+- 1
+accelerator: ddp
+sync_bn: true
+precision: 32
+sizes:
+  search_image_size: ${tracker.instance_size}
+  template_image_size: ${tracker.template_size}
+  search_context: ${tracker.search_context}
+  search_bbox_ratio: ${tracker.bbox_ratio}
+  template_bbox_offset: ${tracker.template_bbox_offset}
+  search_image_shift: 48
+  search_image_scale: 0.35
+  template_image_shift: 8
+  template_image_scale: 0.05
+  upscale_factor: 2
+  context_range: 3
+frame_offset: 70
+negative_ratio: 0
+dynamic_frame_offset:
+  start_epoch: 20
+  freq: 5
+  step: 5
+  max_value: 150
+train:
+  datasets:
+  - dataset_type: ${dataset_type}
+    root: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/avist
+    sampling:
+      _target_: utils.sampler.TrackSampler
+      data_path: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/code/SiamABC/AVIST.csv
+      negative_ratio: ${negative_ratio}
+      frame_offset: ${frame_offset}
+      num_samples: 78000
+    transform: photometric
+    regression_weight_label_size: ${tracker.score_size}
+    sizes: ${sizes}
+    stride: ${model.stride}
+val:
+  img_size: 256
+  ann_path: null
+  datasets:
+  - name: nfs
+    root_dir: /media/ramzaveri/12F9CADD61CB0337/cell_tracking/datasets/SOTA_datasets/NFS/NFS
+model:
+  _target_: models.SiamABC.SiamABCNet
+  backbone: custom_fbnet
+  growth_factor: 1.2
+  upsample: pixel_shuffle
+  pretrained: true
+  num_classes: 1
+  num_filters: 32
+  num_channels: 3
+  align: false
+  img_size: 256
+  stride: 2
+  conv_block: sep_conv
+  towernum: 2
+  max_layer: 4
+  crop_template_features: false
+loss:
+  aux_losses:
+    TARGET_CLASSIFICATION_KEY:
+      name: bce
+  coeffs:
+    TARGET_CLASSIFICATION_KEY: 1
+    TARGET_REGRESSION_LABEL_KEY: 1
+optimizer:
+  name: adam
+  lr: 0.0001
+scheduler:
+  name: plateau
+  mode: max
+  patience: 10
+  factor: 0.5
+  min_lr: 1.0e-06
+  warmup_steps: 200
+phase: train
+task: Visual Object Tracking
+sampler: none
+min_epochs: 100
+max_epochs: 500
+early_stopping: 20
+batch_size:
+  train: 32
+  val: 1
+save_top_k: 3
+parallel: false
+num_classes: 1
+metric_to_monitor: valid/metrics/box_iou
+metric_mode: max
+replace_sampler_ddp: false
+best_worst_miner:
+  max_images: 16
+  metric_to_monitor: loss
+  metric_mode: min
+tracker:
+  _target_: SiamABC_tracker.SiamABCTracker
+  penalty_k: 0.062
+  window_influence: 0.38
+  lr: 0.765
+  windowing: cosine
+  total_stride: 16
+  score_size: 16
+  ratio: 0.94
+  stride: ${model.stride}
+  bbox_ratio: 0.5
+  template_bbox_offset: 0.2
+  search_context: 2
+  instance_size: 256
+  template_size: 128
+local_run: false
+experiment:
+  name: SiamABC
+dataset_type: siam

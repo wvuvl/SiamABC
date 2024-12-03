@@ -50,7 +50,7 @@ class BoxCoder(ABC):
         pass
 
 
-class AEVTBoxCoder(BoxCoder):
+class SiamABCBoxCoder(BoxCoder):
     def __init__(self, tracker_config: Dict[str, Any]) -> None:
         super().__init__(tracker_config=tracker_config)
 
@@ -108,15 +108,15 @@ class AEVTBoxCoder(BoxCoder):
         return TrackerDecodeResult(bbox=torch.stack(bboxes), pred_coords=pred_coords)
 
 
-def get_box_coder(tracker_config: Dict[str, Any], tracker_name: str = "aevt") -> Optional[BoxCoder]:
+def get_box_coder(tracker_config: Dict[str, Any], tracker_name: str = "SiamABC") -> Optional[BoxCoder]:
     """
 
     :param tracker_config: Dict[str, Any]
     :param tracker_name: str - name of the tracker
     :return: box_coder: BoxCoder - box coder instance
     """
-    if tracker_name == "aevt":
-        return AEVTBoxCoder(tracker_config=tracker_config)
+    if tracker_name == "SiamABC":
+        return SiamABCBoxCoder(tracker_config=tracker_config)
     return None
 
 
@@ -127,7 +127,7 @@ if __name__ == '__main__':
         "instance_size": 256
     }
     
-    box_coder = AEVTBoxCoder(tracker_config=tracker_config)
+    box_coder = SiamABCBoxCoder(tracker_config=tracker_config)
     bboxes = torch.tensor([[54, 60, 84, 90]])
     encoded  = box_coder.encode(bboxes)
     print()

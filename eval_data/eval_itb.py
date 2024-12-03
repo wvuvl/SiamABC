@@ -70,7 +70,8 @@ def eval_itb_tune(result_path, json_path):
     n_seq = len(seqs)
     thresholds_overlap = np.arange(0, 1.05, 0.05)
     success_overlap = np.zeros((n_seq, 1, len(thresholds_overlap)))
-
+    thr_ce = np.arange(0, 51)
+    prec_overlap = np.zeros((n_seq, 1, len(thr_ce)))
     for i in range(n_seq):
         seq = seqs[i]
         gt_rect = np.array(annos[seq]['gt_rect']).astype("float")
@@ -78,13 +79,18 @@ def eval_itb_tune(result_path, json_path):
         bb = get_result_bb(result_path, seq)
         center = convert_bb_to_center(bb)
         success_overlap[i][0] = compute_success_overlap(gt_rect, bb)
+        prec_overlap[i][0] = compute_success_error(gt_center, center)
 
     auc = success_overlap[:, 0, :].mean()
+    prec = prec_overlap[:, 0, 20].mean()
+    succ_rate_50 = success_overlap[:, 0, 10].mean()
+    
+    print(auc, prec, succ_rate_50)
     return auc
 
 
 if __name__ == "__main__":
     
-    result_path = '/new_local_storage/zaveri/code/SiamABC/itb_penalty_k_0_4650_w_influence_0_1290_lr_0_0880'
-    json_path = '/new_local_storage/zaveri/SOTA_Tracking_datasets/itb/itb.json'
+    result_path = '/new_local_storage/zaveri/code/experiments/2024-07-09-14-33-06_Tracking_SiamABC/SiamABC_lambda_0.25_contineous_True/results/ITB/SiamABCTracker'
+    json_path = '/new_local_storage/zaveri/SOTA_Tracking_datasets/ITB/ITB.json'
     print(eval_itb_tune(result_path, json_path))
