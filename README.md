@@ -12,7 +12,7 @@
 WACV 2025
 </div>
 
-This repository is the official implementation of [SiamABC](https://arxiv.org/pdf/2411.18855), an single object tracker designed for efficiently tracking under adverse visibility conditions.
+This repository is the official implementation of [SiamABC](https://arxiv.org/pdf/2411.18855), a single object tracker designed for efficiently tracking under adverse visibility conditions.
 
 
 ![](docs/static/images/approach.png)
