@@ -51,6 +51,30 @@ The SiamABC model is available in the `assets/model.pt`.  Run the following code
 python realtime_test.py --initial_bbox=[416, 414, 61, 97] --video_path=assets/penguin_in_fog.mp4 --output_path=outputs/penguin_in_fog.mp4
 ```
 
+## Training
+Training is done similar to the [FEAR](https://github.com/PinataFarms/FEARTracker) Framework. We use GOT-10K, LaSOT, COCO2017, and TrackingNet train sets for training. As explained in [FEAR](https://github.com/PinataFarms/FEARTracker) framework,
+you could create CSV annotation file for each of training datasets.
+
+The annotation file for each dataset should have the following format:
+- `sequence_id: str` - unique identifier of video file
+- `track_id: str` - unique identifier of scene inside video file
+- `frame_index: int` - index of frame inside video
+- `img_path: str` - location of frame image relative to root folder with all datasets
+- `bbox: Tuple[int, int, int, int]` - bounding box of object in a format `x, y, w, h`
+- `frame_shape: Tuple[int, int]` - width and height of image
+- `dataset: str` - label to identify dataset (example: `got10k`)
+- `presence: int` - presence of the object (example, `0/1`)
+- `near_corner: int` - is bounding box touches borders of the image (example, `0/1`)
+
+Place all of your csv files in a folder with  name `train_csv`.
+
+We could not provide CSV annotations as some datasets have license restriction; however, please email the corresponding author and we will gladly provide those files. Alternatively, you could use the code provided in `core/dataset_utils` to create those csv files for each of those datasets before starting the training. 
+
+Please modify the following Config file: `core/config/dataset/full_train.yaml` and set `visual_object_tracking_datasets` to where the `train_csv` directory is stored. Now, you are one step away from training the network which is:
+```shell 
+CUDA_VISIBLE_DEVICES=<> python3 train.py
+```
+
 ## Citation
 
 ```bibtex

@@ -2,6 +2,7 @@
 
 visual_object_tracking_datasets: /luna_data/zaveri/code/wacv_code/SiamABC/core/dataset_utils #${visual_object_tracking_datasets}
 
+
 sizes:
   search_image_size: ${tracker.instance_size}
   template_image_size: ${tracker.template_size}
@@ -250,7 +251,7 @@ val:
     # - name: nfs
     #   root_dir: ${visual_object_tracking_datasets}/NFS
     - name: vot
-      root_dir: ${visual_object_tracking_datasets}/vot2018
+      root_dir: vot2018
       version: 2018
     # - name: lasot
     #   root_dir: ${visual_object_tracking_datasets}/LaSOT
@@ -265,7 +266,7 @@ test:
   ann_path:
   datasets:
     - name: vot
-      root_dir: ${visual_object_tracking_datasets}/vot2018
+      root_dir: vot2018
       version: 2018
     # - name: got10k
     #   root_dir: ${visual_object_tracking_datasets}/GOT10k
