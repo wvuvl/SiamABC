@@ -2,7 +2,7 @@
 <div align="center">
 
 [![arXiv](https://img.shields.io/badge/arXiv-2411.00683-red)](https://arxiv.org/pdf/2411.18855)
-[![Project Page](https://img.shields.io/badge/Project-Website-green)](https://wvuvl.github.io/SiamABC_page/)
+[![Project Page](https://img.shields.io/badge/Project-Website-green)](https://wvuvl.github.io/SiamABC/)
 
 [Ram Zaveri](https://ramzaveri.com/),
 [Shivang Patel](https://www.shivangapatel.com/),
