@@ -2,7 +2,7 @@ albumentations==1.0.0
 albumentations-experimental==0.0.1
 coloredlogs==15.0.1
 coremltools==5.1.0
-# Cython==0.29.14
+Cython==0.29.14
 fire==0.3.1
 hydra-core==1.1.0
 -e git+https://github.com/facebookresearch/mobile-vision.git@51804a6873ae1029257cf652179c960cceeecc75#egg=mobile_cv
