@@ -285,7 +285,6 @@ class SiamABCTracker(Tracker):
             crop_size=self.tracking_config["template_size"],
         )
         
-        cv2.imwrite('temp.jpg',template_crop )
         img = self._preprocess_image(template_crop, self._template_transform)
         return self.net.get_features(img)
 
@@ -336,37 +335,12 @@ class SiamABCTracker(Tracker):
             clss_score
         """
         
-        # if self.tracking_state.pred_score >= 0.5:
-        #     self.tracking_config['smooth'] == self.smooth_pred
-        # else:
-        #     self.tracking_config['smooth'] == False
-            
         pred_bbox, pred_score, sim_score = self.run_track(search)
 
-        # if pred_score>=self.cls_threshold:
         self.tracking_state.bbox = pred_bbox
         self.tracking_state.pred_score = pred_score
         self.tracking_state.paths.append(pred_bbox)
-        
-        if self.dynamic_update:
-                        
-            if pred_score>self.running_confidence:
-                self.all_memory_imgs.append([search, pred_bbox])
-                self.classification_scores.append(pred_score)
-                if  self.idx>self.N:
-                    self.dynamic_template_features = self.get_template_features(search, pred_bbox)
-                    self.dynamic_search_features, _, _ = self.get_search_features(search, pred_bbox)
-                    self.idx=0
-            
-            # self.all_memory_imgs.append([search, pred_bbox])
-            # self.classification_scores.append(pred_score) #pred_score)
-            # # if  self.idx%self.N==0:
-            # #     # self.dynamic_template_features = self.get_template_features(search, pred_bbox)
-            #     # self.dynamic_search_features, _, _ = self.get_search_features(search, pred_bbox)
-            # self.select_representatives_from_all()
-            self.idx+=1
-            self.running_confidence = self.update_lambda*pred_score + (1-self.update_lambda)*self.running_confidence
-        
+                
         return pred_bbox, pred_score
 
     def run_track(self, search):

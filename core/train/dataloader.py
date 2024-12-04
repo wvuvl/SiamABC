@@ -14,7 +14,6 @@ import torch
 from torch.utils.data import Dataset
 from torch.utils.data.dataloader import default_collate
 
-from core.utils.gaussian_map import gaussian_label_function
 from core.train.preprocessing import BBoxCropWithOffsets, get_normalize_fn, TRACKING_AUGMENTATIONS, PHOTOMETRIC_AUGMENTATIONS
 from core.utils.box_coder import SiamABCBoxCoder
 from core.utils.utils import handle_empty_bbox, read_img, ensure_bbox_boundaries, convert_center_to_bbox, get_extended_crop, get_regression_weight_label, extend_bbox, convert_xywh_to_xyxy
