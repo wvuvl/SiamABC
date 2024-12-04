@@ -8,14 +8,10 @@ import hydra
 import builtins
 from hydra.utils import instantiate
 from omegaconf import DictConfig
-from torch import nn
 
 from core.train import get_tracking_datasets
-# from core.train.SiamABC_lightning_model import SiamABCLightningModel
-# from core.train.trainer import get_trainer
 from core.train.train_val import SiamABC_train_val
 from core.utils import prepare_experiment, create_logger
-from core.utils.torch_stuff import load_from_lighting, load_optimizer
 logger = create_logger(__name__)
 warnings.filterwarnings("ignore")
 
@@ -45,12 +41,9 @@ def train(gpu, ngpus_per_node, config: Dict[str, Any]) -> None:
     model = instantiate(config["model"])
     print(model)
 
-
-    # model = load_from_lighting(model, '/luna_data/zaveri/code/experiments/2024-02-22-21-44-56_Tracking_SiamABC_S_mixed_polarized_att_w_crr_no_self_sup/SiamABC/trained_model_ckpt_17.pt')
     train_dataset, val_dataset = get_tracking_datasets(config)
    
     trainer = SiamABC_train_val(model=model, config=config, train=train_dataset, val=val_dataset, ngpus_per_node=ngpus_per_node, gpu=gpu)
-    # trainer.optimizer = load_optimizer(trainer.optimizer, '/luna_data/zaveri/code/experiments/2024-02-22-21-44-56_Tracking_SiamABC_S_mixed_polarized_att_w_crr_no_self_sup/SiamABC/trained_model_ckpt_17.pt')
     train_loss, val_ios = trainer.train_network()
 
 
@@ -68,19 +61,17 @@ def run_experiment(hydra_config: DictConfig) -> None:
     config["ddp"] = config["world_size"] > 1 or config["ddp"] == True
     
     # code inspired from simsiam
-    # ngpus_per_node = torch.cuda.device_count()
-    # if config["ddp"] and ngpus_per_node>1:
-    #     # Since we have ngpus_per_node processes per node, the total world_size
-    #     # needs to be adjusted accordingly
-    #     config["world_size"] = ngpus_per_node * config["world_size"]
-    #     # Use torch.multiprocessing.spawn to launch distributed processes: the
-    #     # main_worker process function
-    #     mp.spawn(train, nprocs=ngpus_per_node, args=(ngpus_per_node, config))
-    # else:
-    #     # Simply call main_worker function
-    #     train(config["gpus"][0], ngpus_per_node, config)
-    
-    train(config["gpus"][0], 1, config)
+    ngpus_per_node = torch.cuda.device_count()
+    if config["ddp"] and ngpus_per_node>1:
+        # Since we have ngpus_per_node processes per node, the total world_size
+        # needs to be adjusted accordingly
+        config["world_size"] = ngpus_per_node * config["world_size"]
+        # Use torch.multiprocessing.spawn to launch distributed processes: the
+        # main_worker process function
+        mp.spawn(train, nprocs=ngpus_per_node, args=(ngpus_per_node, config))
+    else:
+        # Simply call main_worker function
+        train(config["gpus"][0], ngpus_per_node, config)
     
 if __name__ == "__main__":
     run_experiment()

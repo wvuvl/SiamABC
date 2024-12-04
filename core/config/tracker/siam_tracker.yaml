@@ -1,7 +1,7 @@
 _target_: SiamABC_tracker.SiamABCTracker
-penalty_k:  0.062 #0.074 #0.045 #0.062 #0.011 #0.062
-window_influence: 0.38 #0.198 #0.38 #0.214 #0.38
-lr: 0.765 # 0.743 # 0.765 #0.429 #0.765
+penalty_k:  0.062 
+window_influence: 0.38 
+lr: 0.765
 windowing: cosine
 total_stride: 16
 score_size: 16

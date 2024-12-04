@@ -6,7 +6,7 @@ hydra:
 
 defaults:
   - backend: gpus
-  - dataset: full_train_vulcan
+  - dataset: full_train
   - model: SiamABC
   - loss: SiamABC_loss
   - optimizer: adam
