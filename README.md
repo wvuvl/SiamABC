@@ -15,7 +15,7 @@ WACV 2025
 This repository is the official implementation of [SiamABC](https://arxiv.org/pdf/2411.18855), a single object tracker designed for efficiently tracking under adverse visibility conditions.
 
 
-## Todo
+## Todo (In Progress)
 
 - [x] Commit the base version 
 - [ ] Commit dynamic update module
