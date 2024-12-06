@@ -15,6 +15,13 @@ WACV 2025
 This repository is the official implementation of [SiamABC](https://arxiv.org/pdf/2411.18855), a single object tracker designed for efficiently tracking under adverse visibility conditions.
 
 
+### Todo
+
+- [x] Commit the base version 
+- [ ] Commit dynamic update module
+- [ ] Commit dynamic test-time adaptation module  
+
+
 ![](docs/static/images/approach.png)
 The Feature Extraction Block uses a readily available backbone to process the frames. The RelationAware Block exploits representational relations among the dual-template and dual-search-region through our losses, where dual-template and dual-search-region representations are obtained via our learnable FMF layer. The Heads Block learns lightweight convolution layers to infer the bounding box and the classification score through standard tracking losses. During inference, the tracker adapts to every instance through our Dynamic Test-Time Adaptation framework.
 
