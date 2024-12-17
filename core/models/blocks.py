@@ -298,3 +298,31 @@ class CorrelationConcat(nn.Module):
         s = torch.cat([s, d], dim=1)
         s = self.enc(s)
         return s   
+    
+
+class CorrelationConcat(nn.Module):
+    """
+    Correlation module
+    """
+
+    def __init__(self, num_channels: int, num_corr_channels: int = 64):
+        super().__init__()
+        
+
+        in_size = num_channels + num_corr_channels             
+        self.enc = nn.Sequential(
+            ConvBlock(in_size, num_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(num_channels),
+            nn.ReLU(inplace=True),
+        )
+        # self.att = ParallelPolarizedSelfAttention(num_channels)
+        self.att = FastParallelPolarizedSelfAttention(num_channels, 1)
+        
+    def forward(self, z, x, d):
+        
+        b, c, w, h = x.size()
+        s = torch.matmul(z.permute(0, 2, 1), x.view(b, c, -1)).view(b, -1, w, h)
+        s = torch.cat([s, d], dim=1)
+        s = self.enc(s)
+        s = self.att(s)
+        return s   

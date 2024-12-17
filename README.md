@@ -19,7 +19,7 @@ This repository is the official implementation of [SiamABC](https://arxiv.org/pd
 
 - [x] Commit the base version 
 - [ ] Commit dynamic update module
-- [ ] Commit dynamic test-time adaptation module  
+- [x] Commit dynamic test-time adaptation module  
 
 ## Approach
 

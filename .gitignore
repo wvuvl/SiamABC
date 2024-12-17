@@ -1,2 +1,6 @@
 *.csv
 *__pycache__*
+tune_tpe.py
+scripts
+eval_toolkit
+eval_data

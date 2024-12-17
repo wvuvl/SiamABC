@@ -12,6 +12,7 @@ from typing import List, Optional, Union
 from pytorch_toolbelt.utils import transfer_weights
 from SiamABC_tracker import SiamABCTracker
 from core.utils.hydra import load_hydra_config_from_path
+from core.models.custom_bn import replace_layers
 
 def load_model(
     model: nn.Module, checkpoint_path: str, map_location: Optional[Union[int, str]] = None, strict: bool = True
@@ -32,6 +33,13 @@ def load_model(
 def get_tracker(config_path: str, config_name: str, weights_path: str) -> SiamABCTracker:
     config = load_hydra_config_from_path(config_path=config_path, config_name=config_name)
     model = instantiate(config["model"])
+        
+    replace_layers(model.connect_model.cls_dw, 0.1, False)
+    replace_layers(model.connect_model.reg_dw,  0.1, False)
+    replace_layers(model.connect_model.bbox_tower,  0.1, False)
+    replace_layers(model.connect_model.cls_tower,  0.1, False)
+    print(model)
+    
     model = load_model(model, weights_path, strict=False).cuda().eval()
     tracker: SiamABCTracker = instantiate(config["tracker"], model=model)
     return tracker
