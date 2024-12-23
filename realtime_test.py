@@ -75,7 +75,7 @@ def main(
     output_path: str = "outputs/penguin_in_fog.mp4",
     config_path: str = "core/config",
     config_name: str = "SiamABC_tracker",
-    weights_path: str = "assets/model.pt",
+    weights_path: str = "assets/S_Tiny/model_S_Tiny_v1.pt",
 ):
     tracker = get_tracker(config_path=config_path, config_name=config_name, weights_path=weights_path)
     video, metadata = iio.imread(video_path), iio.immeta(video_path, exclude_applied=False)

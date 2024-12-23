@@ -250,13 +250,11 @@ class SiamABCTracker(Tracker):
         self._template_features = self.get_template_features(image, rect)
         self.dynamic_template_features = self._template_features.clone()
         self.dynamic_search_features,_,_ = self.get_search_features(image, rect)
-        # self.pscores = deque([1.], maxlen=self.N)
-        # self.avg_pscores = deque([1.], maxlen=self.N)
         
         
         
-        self.all_memory_imgs = deque([[image,rect]], maxlen=5000) #self.N)
-        self.classification_scores= deque([1.], maxlen=5000) #self.N)
+        self.all_memory_imgs = deque([[image,rect]], maxlen=5000)
+        self.classification_scores= deque([1.], maxlen=5000)
         
         self.running_dynamic_image = image
         self.running_dynamic_bbox = rect
@@ -269,7 +267,7 @@ class SiamABCTracker(Tracker):
         self.lost_idx = 0
         self.slection_method = 'mean'
         
-        self.update_lambda = 0.25
+        self.update_lambda = 0.1
         self.running_confidence = 1.
 
         
@@ -320,7 +318,8 @@ class SiamABCTracker(Tracker):
                 return
         
     def select_representatives(self): 
-        
+        if len(self.classification_scores) == 0:
+            return
         indexes = np.argmax(self.classification_scores)
         self.dynamic_template_features = self.get_template_features(self.all_memory_imgs[indexes][0], self.all_memory_imgs[indexes][1])
         self.dynamic_search_features, _, _ = self.get_search_features(self.all_memory_imgs[indexes][0], self.all_memory_imgs[indexes][1])
@@ -336,11 +335,19 @@ class SiamABCTracker(Tracker):
         """
         
         pred_bbox, pred_score, sim_score = self.run_track(search)
-
         self.tracking_state.bbox = pred_bbox
         self.tracking_state.pred_score = pred_score
         self.tracking_state.paths.append(pred_bbox)
-                
+            
+        if self.dynamic_update:
+            if pred_score>self.running_confidence :
+                self.all_memory_imgs.append([search, pred_bbox])
+                self.classification_scores.append(pred_score)
+            self.idx+=1
+            if  self.idx%self.N==0:
+                self.select_representatives()
+            self.running_confidence = self.update_lambda*pred_score + (1-self.update_lambda)*self.running_confidence
+            
         return pred_bbox, pred_score
 
     def run_track(self, search):
