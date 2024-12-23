@@ -28,7 +28,7 @@ This repository is the official implementation of [SiamABC](https://arxiv.org/pd
 ![](docs/static/images/approach.png)
 The Feature Extraction Block uses a readily available backbone to process the frames. The RelationAware Block exploits representational relations among the dual-template and dual-search-region through our losses, where dual-template and dual-search-region representations are obtained via our learnable FMF layer. The Heads Block learns lightweight convolution layers to infer the bounding box and the classification score through standard tracking losses. During inference, the tracker adapts to every instance through our Dynamic Test-Time Adaptation framework.
 
-## OOD Comparison
+<!-- ## OOD Comparison
 <p align="center">
   <img src="docs/static/images/fig_quant.png" alt="method" style="max-width: 50%;">
 </p>
@@ -43,7 +43,7 @@ Comparison of our trackers with others on the AVisT dataset on a CPU. We show th
 ## AVisT, NFS30, UAV123, TrackingNet, GOT-10k, and LaSOT benchmarks
 <p align="center">
   <img src="docs/static/images/table_2.png" alt="method" style="max-width: 70%;">
-</p>
+</p> -->
 
 
 ## Environment setup
