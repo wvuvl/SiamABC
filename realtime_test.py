@@ -30,14 +30,14 @@ def load_model(
     return model
 
 
-def get_tracker(config_path: str, config_name: str, weights_path: str) -> SiamABCTracker:
-    config = load_hydra_config_from_path(config_path=config_path, config_name=config_name)
+def get_tracker(config, weights_path: str, lambda_tta: int = 0.1) -> SiamABCTracker:
+    
     model = instantiate(config["model"])
         
-    replace_layers(model.connect_model.cls_dw, 0.1, False)
-    replace_layers(model.connect_model.reg_dw,  0.1, False)
-    replace_layers(model.connect_model.bbox_tower,  0.1, False)
-    replace_layers(model.connect_model.cls_tower,  0.1, False)
+    replace_layers(model.connect_model.cls_dw, lambda_tta, False)
+    replace_layers(model.connect_model.reg_dw,  lambda_tta, False)
+    replace_layers(model.connect_model.bbox_tower,  lambda_tta, False)
+    replace_layers(model.connect_model.cls_tower,  lambda_tta, False)
     print(model)
     
     model = load_model(model, weights_path, strict=False).cuda().eval()
@@ -75,19 +75,21 @@ def main(
     output_path: str = "outputs/penguin_in_fog.mp4",
     config_path: str = "core/config",
     config_name: str = "SiamABC_tracker",
+    model_size: str = "S_Tiny",
     weights_path: str = "assets/S_Tiny/model_S_Tiny_v1.pt",
 ):
-    tracker = get_tracker(config_path=config_path, config_name=config_name, weights_path=weights_path)
+    config = load_hydra_config_from_path(config_path=config_path, config_name=config_name)
+    config["model"]["model_size"] = 'S' if model_size=="S_Tiny" else 'M'
+        
+    tracker = get_tracker(config=config, weights_path=weights_path)
     video, metadata = iio.imread(video_path), iio.immeta(video_path, exclude_applied=False)
-    # print(metadata)
+
     initial_bbox = np.array(initial_bbox).astype(int)
     tracked_bboxes = track(tracker, video, initial_bbox)
-    # print(initial_bbox)
-    # print(tracked_bboxes)
+
     visualized_video = visualize(video, tracked_bboxes)
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    
-    # print(visualized_video)
+
     iio.imwrite(output_path, visualized_video, fps=metadata["fps"])
     
     head, tail = os.path.split(output_path)
@@ -98,7 +100,7 @@ def main(
         for i in tracked_bboxes:
             f.write(f'{i[0]} {i[1]} {i[2]} {i[3]} \n')
         
-
+        
 if __name__ == '__main__':
     Fire(main)
     
