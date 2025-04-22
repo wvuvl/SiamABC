@@ -90,12 +90,13 @@ CUDA_VISIBLE_DEVICES=<> python3 train.py
 ## Citation
 
 ```bibtex
-@inproceedings{zaveri2025siamabc,
-    title={Improving Accuracy and Generalization for Efficient Visual Tracking},
-    author={Zaveri, Ram and Patel, Shivang and Gu, Yu and Doretto, Gianfranco},
-    booktitle={Winter Conference on Applications of Computer Vision},
-    year={2025},
-    organization={IEEE/CVF}
+@InProceedings{Zaveri_2025_WACV,
+    author    = {Zaveri, Ram and Patel, Shivang and Gu, Yu and Doretto, Gianfranco},
+    title     = {Improving Accuracy and Generalization for Efficient Visual Tracking},
+    booktitle = {Proceedings of the Winter Conference on Applications of Computer Vision (WACV)},
+    month     = {February},
+    year      = {2025},
+    pages     = {9450-9460}
 }
 ```
 
