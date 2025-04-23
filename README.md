@@ -2,7 +2,7 @@
 <div align="center">
 
 [![Conference](https://img.shields.io/badge/WACV-2025-blue)](https://openaccess.thecvf.com/content/WACV2025/html/Zaveri_Improving_Accuracy_and_Generalization_for_Efficient_Visual_Tracking_WACV_2025_paper.html)
-[![arXiv](https://img.shields.io/badge/arXiv-2411.00683-red)](https://arxiv.org/pdf/2411.18855)
+[![arXiv](https://img.shields.io/badge/arXiv-2411.18855-red)](https://arxiv.org/pdf/2411.18855)
 [![Project Page](https://img.shields.io/badge/Project-Website-green)](https://wvuvl.github.io/SiamABC/)
 
 [Ram Zaveri](https://ramzaveri.com/),
