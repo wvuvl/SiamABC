@@ -59,7 +59,7 @@ pip install -r requirements.txt
 
 The SiamABC models are available in the `assets` folder.  Run the following code:
 ```shell
-python realtime_test.py --initial_bbox=[416, 414, 61, 97] --video_path=assets/penguin_in_fog.mp4 --output_path=outputs/penguin_in_fog.mp4
+python realtime_test.py --initial_bbox=[416,414,61,97] --video_path=assets/penguin_in_fog.mp4 --output_path=outputs/penguin_in_fog.mp4
 ```
 If you wish to try various models please refer to `assets\S_Tiny` folder for S-Tiny models and `assets\S_Small` folder for S-Small models. We provide a population of models in each for them so that you may choose the best for your sequence. Additionally, if you wish to tune specific hyperparameters for a given dataset, please refer to the code released by [Ocean](https://github.com/researchmm/TracKit/blob/master/tracking/tune_tpe.py).
 
